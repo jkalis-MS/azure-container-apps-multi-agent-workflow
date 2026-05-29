@@ -1,0 +1,13 @@
+{
+  "name": "worldcup-demo",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "packages/orchestrator",
+    "packages/blog-generator",
+    "packages/narration-generator"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present"
+  }
+}
