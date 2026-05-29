@@ -1,0 +1,18 @@
+node_modules/
+dist/
+.env
+*.log
+__pycache__/
+*.pyc
+.venv/
+
+# HAR files contain sensitive tokens/cookies
+*.har
+
+# Secret files
+_clientid.txt
+_secret.txt
+
+# Bug reports with environment-specific info
+bug-report-*.md
+infra/main.json

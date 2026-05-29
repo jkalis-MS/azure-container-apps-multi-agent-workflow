@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>⚽ World Cup Match Simulator</title>
+  <style>
+    :root {
+      --bg: #0c0c0c;
+      --surface: #1a1a1a;
+      --border: #333;
+      --text: #b0b0b0;
+      --bright: #e0e0e0;
+      --green: #00ff41;
+      --green-dim: #00cc33;
+      --red: #ff3333;
+      --yellow: #cccc00;
+      --cyan: #00cccc;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Cascadia Code', 'Fira Code', 'SF Mono', 'Consolas', monospace;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      font-size: 14px;
+    }
+    .container { max-width: 1200px; margin: 0 auto; padding: 1.5rem; }
+
+    h1 {
+      font-size: 1.5rem;
+      text-align: center;
+      margin-bottom: 0.3rem;
+      color: var(--green);
+      font-weight: 700;
+      letter-spacing: 1px;
+    }
+    .subtitle { text-align: center; color: #666; margin-bottom: 1.5rem; font-size: 0.85rem; }
+
+    /* Prompt input */
+    .prompt-section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 1rem;
+      margin-bottom: 1.5rem;
+    }
+    .prompt-section textarea {
+      width: 100%;
+      background: #111;
+      color: var(--green);
+      border: 1px solid var(--border);
+      border-radius: 2px;
+      padding: 0.75rem;
+      font-size: 0.9rem;
+      resize: vertical;
+      min-height: 70px;
+      font-family: inherit;
+    }
+    .prompt-section textarea::placeholder { color: #444; }
+    .prompt-section textarea:focus { outline: none; border-color: var(--green-dim); }
+    .prompt-section > button {
+      margin-top: 0.75rem;
+      padding: 0.6rem 1.5rem;
+      background: var(--green-dim);
+      color: #000;
+      border: none;
+      border-radius: 2px;
+      font-size: 0.9rem;
+      font-weight: 700;
+      font-family: inherit;
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      transition: background 0.2s;
+    }
+    .prompt-section > button:disabled { opacity: 0.4; cursor: not-allowed; }
+    .prompt-section > button:hover:not(:disabled) { background: var(--green); }
+    .examples { margin-top: 0.5rem; display: flex; flex-wrap: wrap; gap: 0.4rem; }
+    .examples button {
+      background: transparent;
+      color: var(--cyan);
+      border: 1px solid #2a2a2a;
+      border-radius: 2px;
+      padding: 0.3rem 0.6rem;
+      font-size: 0.75rem;
+      font-family: inherit;
+      cursor: pointer;
+    }
+    .examples button:hover { border-color: var(--cyan); background: rgba(0,204,204,0.05); }
+
+    /* Agent panels */
+    .agents { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
+    .agent-panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 1rem;
+      min-height: 180px;
+    }
+    .agent-panel h3 {
+      font-size: 0.85rem;
+      margin-bottom: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--bright);
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 0.5rem;
+    }
+    .agent-panel .icon { font-size: 1.1rem; }
+    .log-entry {
+      padding: 0.3rem 0;
+      font-size: 0.8rem;
+      border-bottom: 1px solid #222;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      line-height: 1.4;
+    }
+    .log-entry:last-child { border-bottom: none; }
+    .log-entry .status-icon { flex-shrink: 0; }
+    .log-entry .timer { margin-left: auto; font-size: 0.7rem; color: #555; font-variant-numeric: tabular-nums; }
+    .status-started { color: var(--green-dim); }
+    .status-done { color: var(--green); }
+    .status-error { color: var(--red); }
+    .spinner { display: inline-block; animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Blinking cursor effect for the title */
+    h1::after {
+      content: '▊';
+      animation: blink 1s step-end infinite;
+      color: var(--green);
+      margin-left: 2px;
+    }
+    @keyframes blink { 50% { opacity: 0; } }
+
+    /* Results */
+    .results { display: none; }
+    .results.visible { display: block; }
+    .result-section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 1.25rem;
+      margin-bottom: 1.25rem;
+    }
+    .result-section h2 { font-size: 1rem; margin-bottom: 0.75rem; color: var(--bright); }
+
+    /* Score card */
+    .score-card {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 2rem;
+      padding: 1.25rem;
+      background: #111;
+      border: 1px solid var(--green-dim);
+      border-radius: 4px;
+      margin-bottom: 1rem;
+    }
+    .team-name { font-size: 1.1rem; font-weight: 600; color: var(--bright); }
+    .score { font-size: 2.5rem; font-weight: 800; color: var(--green); }
+
+    .goal-list { list-style: none; }
+    .goal-list li {
+      padding: 0.4rem 0;
+      border-bottom: 1px solid #222;
+      font-size: 0.85rem;
+    }
+    .goal-list .minute { color: var(--green); font-weight: 700; margin-right: 0.5rem; }
+
+    /* Blog */
+    .blog-content { line-height: 1.7; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    .blog-content h1 { font-size: 1.3rem; color: var(--green); margin-bottom: 0.75rem; }
+    .blog-content h2 { font-size: 1.1rem; color: var(--cyan); margin: 1rem 0 0.5rem; }
+    .blog-content p { margin-bottom: 0.6rem; color: var(--text); }
+    .blog-content blockquote {
+      border-left: 3px solid var(--green-dim);
+      padding-left: 1rem;
+      margin: 1rem 0;
+      font-style: italic;
+      color: #777;
+    }
+
+    /* Audio */
+    audio { width: 100%; margin-top: 0.5rem; filter: hue-rotate(100deg); }
+    .narration-script {
+      margin-top: 0.75rem;
+      padding: 0.75rem;
+      background: #111;
+      border: 1px solid #222;
+      border-radius: 2px;
+      font-style: italic;
+      line-height: 1.6;
+      color: var(--text);
+    }
+
+    /* Sandbox logs */
+    .sandbox-logs { margin-top: 1rem; }
+    .sandbox-log {
+      font-size: 0.8rem;
+      padding: 0.25rem 0.5rem;
+      margin: 0.2rem 0;
+      border-radius: 2px;
+    }
+    .sandbox-log.allowed { background: rgba(0,255,65,0.05); border-left: 3px solid var(--green-dim); }
+    .sandbox-log.denied { background: rgba(255,51,51,0.08); border-left: 3px solid var(--red); }
+
+    /* Research section */
+    .research-section { margin-top: 1.25rem; }
+    .research-query {
+      background: #111;
+      border: 1px solid #222;
+      border-radius: 2px;
+      padding: 0.6rem;
+      margin: 0.4rem 0;
+    }
+    .research-query h4 {
+      font-size: 0.8rem;
+      color: var(--cyan);
+      margin-bottom: 0.3rem;
+    }
+    .research-query .snippet {
+      font-size: 0.75rem;
+      color: #777;
+      padding: 0.15rem 0;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    .research-query .snippet:last-child { border-bottom: none; }
+    .reasoning-box {
+      background: #111;
+      border: 1px solid var(--yellow);
+      border-radius: 2px;
+      padding: 0.75rem;
+      margin-top: 0.75rem;
+      font-size: 0.8rem;
+      line-height: 1.5;
+      color: #999;
+    }
+    .reasoning-box h4 { color: var(--yellow); margin-bottom: 0.4rem; font-size: 0.85rem; }
+
+    .generated-code {
+      background: #0a0a0a;
+      color: var(--green);
+      font-family: 'Cascadia Code', 'Fira Code', monospace;
+      font-size: 0.7rem;
+      padding: 0.6rem;
+      border-radius: 2px;
+      border: 1px solid #222;
+      overflow-x: auto;
+      white-space: pre;
+      max-height: 300px;
+      overflow-y: auto;
+      margin-top: 0.3rem;
+    }
+
+    @media (max-width: 768px) {
+      .agents { grid-template-columns: 1fr; }
+      .score-card { gap: 1rem; }
+      .score { font-size: 2rem; }
+    }
+
+    /* Architecture Drawer */
+    .arch-link {
+      position: fixed;
+      top: 1rem;
+      right: 1.5rem;
+      color: var(--cyan);
+      font-size: 0.8rem;
+      cursor: pointer;
+      text-decoration: none;
+      border: 1px solid var(--cyan);
+      padding: 0.3rem 0.7rem;
+      border-radius: 2px;
+      z-index: 1000;
+      transition: background 0.2s;
+    }
+    .arch-link:hover { background: rgba(0,204,204,0.1); }
+
+    .drawer-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.75);
+      z-index: 1001;
+    }
+    .drawer-overlay.open { display: block; }
+
+    .drawer {
+      position: fixed;
+      top: 0;
+      right: -600px;
+      width: 580px;
+      max-width: 90vw;
+      height: 100vh;
+      background: var(--surface);
+      border-left: 1px solid var(--border);
+      z-index: 1002;
+      overflow-y: auto;
+      padding: 2rem 1.5rem;
+      transition: right 0.3s ease;
+    }
+    .drawer.open { right: 0; }
+
+    .drawer h2 { color: var(--green); font-size: 1.1rem; margin-bottom: 1rem; }
+    .drawer h3 { color: var(--cyan); font-size: 0.9rem; margin: 1.2rem 0 0.5rem; }
+    .drawer p { color: var(--text); font-size: 0.82rem; line-height: 1.6; margin-bottom: 0.6rem; }
+    .drawer pre {
+      background: #0a0a0a;
+      border: 1px solid #222;
+      border-radius: 2px;
+      padding: 0.75rem;
+      font-size: 0.68rem;
+      overflow-x: auto;
+      color: var(--green);
+      line-height: 1.4;
+      margin: 0.75rem 0;
+    }
+    .drawer table { width: 100%; border-collapse: collapse; font-size: 0.78rem; margin: 0.75rem 0; }
+    .drawer th { text-align: left; color: var(--bright); padding: 0.4rem 0.5rem; border-bottom: 1px solid var(--border); }
+    .drawer td { padding: 0.4rem 0.5rem; border-bottom: 1px solid #222; color: var(--text); }
+    .drawer .close-btn {
+      position: absolute;
+      top: 1rem;
+      right: 1rem;
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-size: 1.2rem;
+      cursor: pointer;
+      padding: 0.2rem 0.5rem;
+      border-radius: 2px;
+    }
+    .drawer .close-btn:hover { border-color: var(--red); color: var(--red); }
+  </style>
+  <style>
+    .flag { height: 1em; vertical-align: -0.1em; margin: 0 2px; display: inline-block; }
+    .flag-lg { height: 1.4em; vertical-align: -0.2em; }
+  </style>
+</head>
+<body>
+  <a class="arch-link" onclick="toggleDrawer()">📐 Scenario &amp; Architecture</a>
+
+  <div class="drawer-overlay" id="drawerOverlay" onclick="toggleDrawer()"></div>
+  <div class="drawer" id="archDrawer">
+    <button class="close-btn" onclick="toggleDrawer()">✕</button>
+    <h2>⚽ World Cup 2026 Match Simulator</h2>
+    <p>A multi-agent system that simulates a <strong>Mexico vs Czechia</strong> World Cup 2026 match using AI-generated code running in isolated sandbox microVMs.</p>
+
+    <h3>How It Works</h3>
+    <p>Enter a prompt describing the match scenario. The system fires three agents in parallel:</p>
+    <p><strong>🔬 Simulator Agent</strong> (Python / LangGraph) — Uses GPT-4o to generate Python code that searches the web for current team data, then generates more code to compute the simulation. All code executes in isolated sandboxes with an egress firewall.</p>
+    <p><strong>📝 Blog Agent</strong> (.NET / Microsoft Agent Framework) — Takes the simulation result and generates a match report article using GPT-4o via IChatClient + ChatClientAgent.</p>
+    <p><strong>🎙️ Narration Agent</strong> (Python / GitHub Copilot SDK) — Generates a sports commentary script with multi-turn refinement via CopilotClient sessions, then converts it to audio using TTS-HD.</p>
+
+    <h3>Azure Services Showcased</h3>
+    <table>
+      <tr><th>Feature</th><th>How</th></tr>
+      <tr><td>Container Apps</td><td>4 microservices deployed to a shared environment</td></tr>
+      <tr><td>Sandboxes — Code Isolation</td><td>AI-generated Python runs safely in microVMs</td></tr>
+      <tr><td>Sandboxes — Egress Firewall</td><td>ESPN, Sky Sports, Marca blocked; FIFA, BBC, Wikipedia, Google allowed</td></tr>
+      <tr><td>Sandboxes — Secure Key Injection</td><td>API key injected via egress Transform rule using secret reference — code never sees it</td></tr>
+      <tr><td>Sandboxes — Parallel Execution</td><td>3-5 search sandboxes run simultaneously</td></tr>
+      <tr><td>Azure OpenAI</td><td>GPT-4o for code gen & simulation; TTS-HD for narration</td></tr>
+    </table>
+
+    <h3>Architecture</h3>
+    <pre>
+┌──────────────┐       ┌─────────────────────────────────────────────────┐
+│   Browser    │──SSE──│  Orchestrator (port 3000)                       │
+└──────────────┘       └──────┬──────────────┬──────────────┬────────────┘
+                              │              │              │
+                    POST /run │    POST /gen │    POST /gen │
+                              ▼              ▼              ▼
+                    ┌──────────────┐ ┌────────────┐ ┌──────────────┐
+                    │  Simulator   │ │  Blog Gen  │ │ Narration Gen│
+                    │  (FastAPI)   │ │  (.NET)    │ │  (FastAPI)   │
+                    └──────┬───────┘ └────────────┘ └──────────────┘
+                           │
+              GPT-4o generates Python code
+                           │
+            ┌──────────────┼──────────────┐
+            ▼              ▼              ▼
+     ┌────────────┐ ┌────────────┐ ┌────────────┐
+     │ Sandbox 1  │ │ Sandbox 2  │ │ Sandbox N  │  ← microVMs
+     │ (search)   │ │ (search)   │ │ (compute)  │
+     └────────────┘ └────────────┘ └─────┬──────┘
+            │                             │
+     ✅ Wikipedia API            ┌─────────▼──────────┐
+     ✅ Google Search            │  Egress Firewall   │
+     ✅ FIFA.com                 │  ┌───────────────┐ │
+     ✅ BBC Sport                │  │ Transform:    │ │
+     🚫 ESPN.com                 │  │ inject api-key│ │
+     🚫 Sky Sports               │  │ from secret   │ │
+     🚫 Marca                    │  └───────┬───────┘ │
+                                └──────────┼─────────┘
+                                           ▼
+                                  ✅ Azure OpenAI
+                                  (key added at egress)</pre>
+
+    <h3>🔒 Secure Egress — API Key Injection</h3>
+    <p>When <strong>"Secure Egress"</strong> is enabled, the sandbox egress firewall uses a <strong>Transform rule</strong> to inject the Azure OpenAI API key into outgoing requests. The code inside the sandbox never has access to the real key.</p>
+    <table>
+      <tr><th>What</th><th>Without Secure Egress</th><th>With Secure Egress ✅</th></tr>
+      <tr><td><code>/tmp/openai_request.txt</code></td><td>Shows real API key in headers</td><td>Shows <code>INJECTED_BY_EGRESS_FIREWALL</code></td></tr>
+      <tr><td>Egress Policy</td><td>No Transform rule</td><td>Transform: inject <code>api-key</code> from secret ref</td></tr>
+      <tr><td>Egress Decisions</td><td>—</td><td><code>matchedRule: inject-aoai-key</code></td></tr>
+      <tr><td>Key storage</td><td>Passed as env var to sandbox code</td><td>Stored as group-level secret, resolved at egress</td></tr>
+    </table>
+    <p style="margin-top:0.6rem;color:var(--dim);font-size:0.78rem">💡 <strong>Demo tip:</strong> Open the simulation sandbox in the Portal → browse <code>/tmp/openai_request.txt</code> or use the terminal to <code>cat</code> it. Compare both modes side by side.</p>
+
+    <h3>Egress Firewall Demo</h3>
+    <p>The sandbox egress policy blocks outbound traffic to specific domains. When AI-generated code tries to fetch from blocked sites, the connection is <strong>reset by the firewall</strong> — demonstrating how sandboxes protect against untrusted code making unauthorized external calls.</p>
+    <table>
+      <tr><th>Site</th><th>Status</th></tr>
+      <tr><td>espn.com</td><td style="color:var(--red)">🚫 BLOCKED</td></tr>
+      <tr><td>skysports.com</td><td style="color:var(--red)">🚫 BLOCKED</td></tr>
+      <tr><td>marca.com</td><td style="color:var(--red)">🚫 BLOCKED</td></tr>
+      <tr><td>fifa.com</td><td style="color:var(--green)">✅ ALLOWED</td></tr>
+      <tr><td>bbc.co.uk</td><td style="color:var(--green)">✅ ALLOWED</td></tr>
+      <tr><td>en.wikipedia.org</td><td style="color:var(--green)">✅ ALLOWED</td></tr>
+      <tr><td>google.com</td><td style="color:var(--green)">✅ ALLOWED</td></tr>
+    </table>
+  </div>
+  <div class="container">
+    <h1>⚽ World Cup 2026 Match Simulator</h1>
+    <p class="subtitle"><img src="https://flagcdn.com/w40/mx.png" class="flag flag-lg" alt="Mexico"> Mexico vs Czechia <img src="https://flagcdn.com/w40/cz.png" class="flag flag-lg" alt="Czechia"> — Powered by Azure Container Apps &amp; Sandboxes</p>
+    
+    <div class="prompt-section">
+      <textarea id="prompt" placeholder="Describe how you want the match simulated..."></textarea>
+      <div class="examples">
+        <button onclick="setExample(0)"><img src="https://flagcdn.com/w20/mx.png" class="flag"><img src="https://flagcdn.com/w20/cz.png" class="flag"> Default lineups</button>
+        <button onclick="setExample(1)"><img src="https://flagcdn.com/w20/mx.png" class="flag"> Custom lineup</button>
+        <button onclick="setExample(2)">🛡️ Defensive battle</button>
+        <button onclick="setExample(3)">⭐ Star player focus</button>
+      </div>
+      <button id="runBtn" onclick="runSimulation()">▶ RUN SIMULATION</button>
+      <label style="margin-left:1rem;display:inline-flex;align-items:center;gap:0.4rem;color:var(--cyan);font-size:0.8rem;cursor:pointer;" title="When enabled, the sandbox egress firewall injects the API key — sandbox code never sees it">
+        <input type="checkbox" id="secureEgress"> 🔒 Secure Egress (inject key via firewall)
+      </label>
+      <button onclick="toggleDrawer()" style="margin-top:0.75rem;margin-left:0.5rem;padding:0.6rem 1.5rem;background:transparent;color:var(--cyan);border:1px solid var(--cyan);border-radius:2px;font-size:0.9rem;font-weight:700;font-family:inherit;cursor:pointer;text-transform:uppercase;letter-spacing:1px;transition:background 0.2s;">📐 Scenario &amp; Architecture</button>
+    </div>
+    
+    <div class="agents">
+      <div class="agent-panel">
+        <h3><span class="icon">🔬</span> Simulator Agent</h3>
+        <div id="sim-logs"></div>
+      </div>
+      <div class="agent-panel">
+        <h3><span class="icon">📝</span> Blog Agent</h3>
+        <div id="blog-logs"></div>
+      </div>
+      <div class="agent-panel">
+        <h3><span class="icon">🎙️</span> Narration Agent</h3>
+        <div id="narration-logs"></div>
+      </div>
+    </div>
+    
+    <div class="results" id="results">
+      <div class="result-section" id="score-section" style="display:none">
+        <h2>📊 Match Result</h2>
+        <div id="score-card"></div>
+        <ul class="goal-list" id="goal-list"></ul>
+        <div class="sandbox-logs" id="sandbox-logs"></div>
+        <div class="research-section" id="research-section"></div>
+      </div>
+      
+      <div class="result-section" id="blog-section" style="display:none">
+        <h2>📝 Match Report</h2>
+        <div class="blog-content" id="blog-content"></div>
+      </div>
+      
+      <div class="result-section" id="narration-section" style="display:none">
+        <h2>🎙️ Match Narration</h2>
+        <div id="narration-content"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function toggleDrawer() {
+      document.getElementById('archDrawer').classList.toggle('open');
+      document.getElementById('drawerOverlay').classList.toggle('open');
+    }
+
+    const EXAMPLES = [
+      "Predict the result, goal scorers and approximate time of each goal if both Mexico and Czechia play with their predicted starting lineups for the 2026 World Cup.",
+      "Predict the result if Mexico starts Raúl Jiménez and Obed Vargas instead of their usual forwards. Czechia plays their strongest XI.",
+      "Simulate a tense, low-scoring match where both teams play very defensively. Who breaks the deadlock and how?",
+      "Czechia's Patrik Schick is in the form of his life and Mexico's defense has been shaky lately. Simulate the match with that context."
+    ];
+    
+    // Timer tracking per panel
+    const panelTimers = {};
+    let timerInterval = null;
+    
+    function startTimer(panel) {
+      panelTimers[panel] = { start: Date.now(), el: null };
+    }
+    
+    function startTickingTimers() {
+      if (timerInterval) return;
+      timerInterval = setInterval(() => {
+        Object.values(panelTimers).forEach(t => {
+          if (t.el) {
+            const secs = ((Date.now() - t.start) / 1000).toFixed(1);
+            t.el.textContent = `${secs}s`;
+          }
+        });
+      }, 200);
+    }
+    
+    function stopTickingTimers() {
+      if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+    }
+    
+    function setExample(i) {
+      document.getElementById('prompt').value = EXAMPLES[i];
+    }
+    setExample(0); // pre-fill
+    
+    function addLog(panel, icon, text, cssClass) {
+      const el = document.getElementById(panel);
+      // If status is done/error, replace the last spinner entry for this panel
+      if (cssClass === 'status-done' || cssClass === 'status-error') {
+        const spinners = el.querySelectorAll('.spinner');
+        if (spinners.length > 0) {
+          const lastSpinner = spinners[spinners.length - 1];
+          lastSpinner.closest('.log-entry').remove();
+        }
+        // Stop ticking for this panel and show final time
+        if (panelTimers[panel]) { panelTimers[panel].el = null; }
+      }
+      const elapsed = panelTimers[panel] ? ((Date.now() - panelTimers[panel].start) / 1000).toFixed(1) + 's' : '';
+      const entry = document.createElement('div');
+      entry.className = 'log-entry';
+      const timerSpan = document.createElement('span');
+      timerSpan.className = 'timer';
+      timerSpan.textContent = elapsed;
+      entry.innerHTML = `<span class="status-icon ${cssClass}">${icon}</span> <span>${text}</span>`;
+      entry.appendChild(timerSpan);
+      // If this is a "started" entry, attach live timer
+      if (cssClass === 'status-started' && panelTimers[panel]) {
+        panelTimers[panel].el = timerSpan;
+        startTickingTimers();
+      }
+      el.appendChild(entry);
+      el.scrollTop = el.scrollHeight;
+    }
+    
+    async function runSimulation() {
+      const prompt = document.getElementById('prompt').value.trim();
+      if (!prompt) return;
+      
+      const btn = document.getElementById('runBtn');
+      btn.disabled = true;
+      btn.textContent = '⏳ RUNNING...';
+      
+      // Don't clear previous results yet — keep them visible until new data arrives
+      let resultsCleared = false;
+      function clearPreviousResults() {
+        if (resultsCleared) return;
+        resultsCleared = true;
+        ['sim-logs', 'blog-logs', 'narration-logs', 'sandbox-logs', 'research-section'].forEach(id => {
+          document.getElementById(id).innerHTML = '';
+        });
+        ['score-section', 'blog-section', 'narration-section'].forEach(id => {
+          document.getElementById(id).style.display = 'none';
+        });
+      }
+      document.getElementById('results').classList.add('visible');
+      
+      try {
+        const secureEgress = document.getElementById('secureEgress').checked;
+        const response = await fetch('/api/simulate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt, secure_egress: secureEgress })
+        });
+        
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+          
+          for (const line of lines) {
+            if (!line.startsWith('data: ')) continue;
+            try {
+              const event = JSON.parse(line.slice(6));
+              if (event.status === 'done' || event.status === 'error') {
+                clearPreviousResults();
+              }
+              handleEvent(event);
+            } catch { /* skip non-JSON lines */ }
+          }
+        }
+      } catch (err) {
+        addLog('sim-logs', '❌', `Error: ${err.message}`, 'status-error');
+      } finally {
+        stopTickingTimers();
+        btn.disabled = false;
+        btn.textContent = '▶ RUN SIMULATION';
+      }
+    }
+    
+    function handleEvent(event) {
+      const { service, status, message, data } = event;
+      
+      const panelMap = { simulator: 'sim-logs', blog: 'blog-logs', narration: 'narration-logs' };
+      const panel = panelMap[service];
+      
+      if (status === 'started') {
+        startTimer(panel);
+        addLog(panel, '<span class="spinner">⏳</span>', message, 'status-started');
+      } else if (status === 'progress') {
+        addLog(panel, 'ℹ️', message, 'status-started');
+      } else if (status === 'done') {
+        addLog(panel, '✅', message, 'status-done');
+      } else if (status === 'error') {
+        addLog(panel, '❌', message, 'status-error');
+      }
+      
+      // Render results
+      if (service === 'simulator' && status === 'done' && data?.simulation) {
+        renderSimulation(data.simulation, data.sandboxLogs, data.sandboxIds, data.researchQueries, data.generatedSimCode);
+      }
+      if (service === 'blog' && status === 'done' && data?.html) {
+        renderBlog(data.html);
+      }
+      if (service === 'narration' && status === 'done') {
+        renderNarration(data);
+      }
+    }
+    
+    function renderSimulation(sim, sandboxLogs, sandboxIds, researchQueries, generatedSimCode) {
+      const section = document.getElementById('score-section');
+      section.style.display = 'block';
+      
+      document.getElementById('score-card').innerHTML = `
+        <div class="score-card">
+          <span class="team-name"><img src="https://flagcdn.com/w40/mx.png" class="flag flag-lg"> ${sim.homeTeam}</span>
+          <span class="score">${sim.homeScore} - ${sim.awayScore}</span>
+          <span class="team-name">${sim.awayTeam} <img src="https://flagcdn.com/w40/cz.png" class="flag flag-lg"></span>
+        </div>
+      `;
+      
+      const goalList = document.getElementById('goal-list');
+      goalList.innerHTML = sim.goals.map(g => {
+        const flagUrl = g.team === 'Mexico' ? 'https://flagcdn.com/w20/mx.png' : 'https://flagcdn.com/w20/cz.png';
+        return `<li><span class="minute">${g.minute}'</span> ⚽ <img src="${flagUrl}" class="flag"> <strong>${g.scorer}</strong> (${g.team}) — ${g.description}</li>`;
+      }).join('');
+      
+      if (sandboxLogs?.length || sandboxIds?.length) {
+        const logsEl = document.getElementById('sandbox-logs');
+        let html = '<h3 style="margin-bottom:0.5rem;font-size:0.95rem">🔒 Sandbox Egress Firewall</h3>';
+        if (sandboxIds?.length) {
+          html += sandboxIds.map(sb => {
+            const id = typeof sb === 'string' ? sb : sb.id;
+            const role = (typeof sb === 'object' && sb.role) ? sb.role : 'Sandbox';
+            const isAOAI = role.includes('OpenAI');
+            const icon = isAOAI ? '🔑' : '📦';
+            const style = isAOAI
+              ? 'background:rgba(255,200,0,0.1);border-left:3px solid #f0c030;'
+              : 'background:rgba(0,200,255,0.07);border-left:3px solid var(--cyan);';
+            return `<div style="font-size:0.75rem;margin-bottom:0.3rem;padding:0.3rem 0.5rem;${style}border-radius:3px;">${icon} <strong>${role}:</strong> <code style="color:var(--cyan);user-select:all">${id}</code></div>`;
+          }).join('');
+        }
+        if (sandboxLogs?.length) {
+          html += sandboxLogs.map(log => {
+            const name = log.label || log.host;
+            if (log.allowed) {
+              return `<div class="sandbox-log allowed">✅ <strong>${name}</strong> <span style="opacity:0.6">(${log.host})</span> — ALLOWED</div>`;
+            } else {
+              return `<div class="sandbox-log denied">🚫 <strong>${name}</strong> <span style="opacity:0.6">(${log.host})</span> — BLOCKED</div>`;
+            }
+          }).join('');
+        }
+        logsEl.innerHTML = html;
+      }
+
+      // Research queries with generated code & reasoning
+      const resEl = document.getElementById('research-section');
+      let resHTML = '';
+      if (researchQueries?.length) {
+        resHTML += '<h3 style="margin-bottom:0.5rem;font-size:0.95rem">🔍 Research Queries</h3>';
+        resHTML += researchQueries.map(rq => `
+          <div class="research-query">
+            <h4>🔎 "${rq.query}"</h4>
+            ${rq.generatedCode ? `<details><summary style="color:var(--cyan);cursor:pointer;font-size:0.75rem;margin-bottom:0.3rem">🤖 View AI-generated code</summary><pre class="generated-code">${escapeHtml(rq.generatedCode)}</pre></details>` : ''}
+            ${(rq.snippets || []).map(s => `<div class="snippet">${s}</div>`).join('')}
+          </div>
+        `).join('');
+      }
+      if (generatedSimCode) {
+        resHTML += `<div class="research-query" style="border-color:var(--yellow)">
+          <h4 style="color:var(--yellow)">🤖 AI-Generated Simulation Code</h4>
+          <details><summary style="color:var(--yellow);cursor:pointer;font-size:0.75rem">View code executed in sandbox</summary><pre class="generated-code">${escapeHtml(generatedSimCode)}</pre></details>
+        </div>`;
+      }
+      if (sim.reasoning) {
+        resHTML += `<div class="reasoning-box"><h4>🧠 Simulation Reasoning</h4>${sim.reasoning}</div>`;
+      }
+      resEl.innerHTML = resHTML;
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+    
+    function renderBlog(html) {
+      document.getElementById('blog-section').style.display = 'block';
+      document.getElementById('blog-content').innerHTML = html;
+    }
+    
+    function renderNarration(data) {
+      document.getElementById('narration-section').style.display = 'block';
+      let html = '';
+      if (data.audioBase64) {
+        html += `<audio controls src="data:${data.audioMimeType};base64,${data.audioBase64}"></audio>`;
+      }
+      if (data.script) {
+        html += `<div class="narration-script">"${data.script}"</div>`;
+      }
+      document.getElementById('narration-content').innerHTML = html;
+    }
+  </script>
+</body>
+</html>
