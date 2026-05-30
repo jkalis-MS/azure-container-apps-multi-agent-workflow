@@ -12,18 +12,17 @@ The solution has four key componenets -
 3. **Agent 2 — Content Creator** (Microsoft Agent Framework / .NET) — Transforms the research brief into an original blog post and social posts, all grounded in real sources.
 4. **Agent 3 — Podcaster** (GitHub Copilot SDK / Python) — Creates an engaging podcast script and generates audio. Can use Azure OpenAI TTS for text to speech transformation.
 
-![alt text](Docs\architecture.png)
+<p align="center"><img src="Docs/architecture.png" alt="Architecture" style="max-width:700px;"></p>
 
 ### Detailed Architecture
 As you see in more detailed architecture, the solution runs three polyglot AI agents (LangGraph, MS Agent Framework, GitHub Copilot SDK) on Azure Container Apps, using ACA Sandboxes to safely execute AI-generated code with egress locked to allow-listed sites. The agents connect to Microsoft Foundry for AI model inference (GPT-4o, TTS) and are fully instrumented with Application Insights for end-to-end observability.
 
-![alt text](Docs\services.png)
+<p align="center"><img src="Docs/services.png" alt="Services" style="max-width:900px;"></p>
 
 ## Next Steps
 Determine which version you would like to use for detailed information -
 
-| Item | Option 1 | Option 2 |
+| Item | Option 1 - Soccer game predictions | Option 2 - Research of a Microsoft technology|
 | --- | --- | --- |
-| Description | First implementation path for the multi-agent workflow | Alternative implementation path for the multi-agent workflow |
-| Readme | [Option1/readme.md](Option1/readme.md) | [Option2/readme.md](Option2/readme.md) |
 | Preview | ![Option 1](Docs/option1.png) | ![Option 2](Docs/option2-dark.png) |
+| Choose your option | [Soccer game predictions](Option1/) | [Research of a Microsoft technology](Option2/) |
