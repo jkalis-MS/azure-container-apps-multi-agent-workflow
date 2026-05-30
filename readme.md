@@ -22,7 +22,6 @@ As you see in more detailed architecture, the solution runs three polyglot AI ag
 ## Next Steps
 Determine which version you would like to use for detailed information -
 
-| Item | Option 1 - Soccer game predictions | Option 2 - Research of a Microsoft technology|
+| Item | Option 1 - [Soccer game predictions](Option1/) | Option 2 - [Research of a Microsoft technology](Option2/)|
 | --- | --- | --- |
 | Preview | ![Option 1](Docs/option1.png) | ![Option 2](Docs/option2-dark.png) |
-| Choose your option | [Soccer game predictions](Option1/) | [Research of a Microsoft technology](Option2/) |
