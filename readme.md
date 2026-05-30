@@ -8,9 +8,9 @@ Find below details about how the outcomes are achieved. This solution can be run
 ### High Level Architecture
 The solution has four key componenets -
 1. **Orchestrator and User Interface** - facilitates interaction with a user - configuration, prompts ans presets the result. On the background it orchestrates the flow among the agents mentioned below. IT Kickc off Agent 1 and passed the outcomes to Agent 2 and 3. 
-2. **Agent 1** (LangGraph / Python) — Researches given topic (soccer game predictions or Microsoft technology). Uses AI for intent detection, ranks sources by relevance, fetches full content from top hits, follows depth-1 links from trusted domains, and synthesizes a research brief. It swarms to ACA Sandboxes with per-domain egress policies to safely research domain specifc information and passes it back to the main agent. Each isolated sandbox reports status and enforces blocked outbound requests.
-3. **Agent 2 — Content Creator** (Microsoft Agent Framework / .NET) — Transforms the research brief into an original blog post and social posts, all grounded in real sources.
-4. **Agent 3 — Podcaster** (GitHub Copilot SDK / Python) — Creates an engaging podcast script and generates audio. Can use Azure OpenAI TTS for text to speech transformation.
+2. **Agent 1 - Researcher** (LangGraph / Python) — Researches given topic (soccer game predictions or Microsoft technology). Uses AI for intent detection, ranks sources by relevance, fetches full content from top hits, follows depth-1 links from trusted domains, and synthesizes a research brief. It swarms to ACA Sandboxes with per-domain egress policies to safely research domain specifc information and passes it back to the main agent. Each isolated sandbox reports status and enforces blocked outbound requests.
+3. **Agent 2 - Creator** (Microsoft Agent Framework / .NET) — Transforms the research brief into an original blog post and social posts, all grounded in real sources.
+4. **Agent 3 - Podcaster** (GitHub Copilot SDK / Python) — Creates an engaging podcast script and generates audio. Can use Azure OpenAI TTS for text to speech transformation.
 
 <p align="center"><img src="Docs/architecture.png" alt="Architecture" style="max-width:700px;"></p>
 

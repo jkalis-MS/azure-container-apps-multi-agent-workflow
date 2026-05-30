@@ -1,0 +1,76 @@
+services:
+  agent-research:
+    build: src/agent-research
+    ports:
+      - "8001:8001"
+    env_file: .env
+    environment:
+      - AGENT_BASE_URL=http://agent-research:8001
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  agent-creator:
+    build:
+      context: src/agent-creator
+      dockerfile: Dockerfile
+    ports:
+      - "8002:8002"
+    env_file: .env
+    environment:
+      - AGENT_BASE_URL=http://agent-creator:8002
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  agent-podcaster:
+    build: src/agent-podcaster
+    ports:
+      - "8003:8003"
+    env_file: .env
+    environment:
+      - AGENT_BASE_URL=http://agent-podcaster:8003
+      - TTS_SERVER_URL=http://tts-server:8004
+      - CONTENT_FACTORY_MODE=${CONTENT_FACTORY_MODE:-lab}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8003/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  tts-server:
+    build: src/tts-server
+    ports:
+      - "8004:8004"
+    environment:
+      - VOICE_SAMPLES_DIR=/app/voice_samples
+    profiles:
+      - gpu
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8004/health')"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+
+  dev-ui:
+    build: src/dev-ui
+    ports:
+      - "8080:8080"
+    depends_on:
+      agent-research:
+        condition: service_healthy
+      agent-creator:
+        condition: service_healthy
+      agent-podcaster:
+        condition: service_healthy

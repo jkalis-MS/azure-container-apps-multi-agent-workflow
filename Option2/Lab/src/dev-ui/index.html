@@ -1,0 +1,1075 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Content Factory - 3 Agents on Azure Container Apps Express and Sandboxes</title>
+    <style>
+        /* ─── Theme Variables ─── */
+        :root {
+            --font: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            /* Dark theme (default – Foundry aesthetic) */
+            --bg-app: #141414;
+            --bg-sidebar: #1c1c1e;
+            --bg-topbar: #1c1c1e;
+            --bg-card: #242428;
+            --bg-card-hover: #2c2c30;
+            --bg-input: #242428;
+            --bg-surface: #1e1e22;
+            --bg-code: #1a1a1e;
+            --border: #2d2d32;
+            --border-subtle: #232328;
+            --text-1: #e8e8ec;
+            --text-2: #a0a0a8;
+            --text-3: #6a6a72;
+            --accent: #643fb2;
+            --accent-light: #8b6cc7;
+            --accent-bg: rgba(100,63,178,0.10);
+            --accent-hover: #5635a0;
+            --btn-bg: #643fb2;
+            --btn-hover: #5635a0;
+            --success: #0faa58;
+            --success-bg: rgba(15,170,88,0.12);
+            --warning: #f0883e;
+            --warning-bg: rgba(240,136,62,0.12);
+            --error: #e74856;
+            --error-bg: rgba(231,72,86,0.12);
+            --shadow: 0 2px 8px rgba(0,0,0,0.32);
+            --sidebar-active: rgba(100,63,178,0.10);
+            --scrollbar: #444;
+            --tag-bg: #2e2e34;
+        }
+        [data-theme="light"] {
+            --bg-app: #f5f5f5;
+            --bg-sidebar: #ffffff;
+            --bg-topbar: #ffffff;
+            --bg-card: #ffffff;
+            --bg-card-hover: #fafafa;
+            --bg-input: #ffffff;
+            --bg-surface: #f0f0f2;
+            --bg-code: #f5f5f7;
+            --border: #e0e0e4;
+            --border-subtle: #ebebef;
+            --text-1: #1b1b1f;
+            --text-2: #616168;
+            --text-3: #9e9ea6;
+            --accent: #643fb2;
+            --accent-light: #8b6cc7;
+            --accent-bg: rgba(100,63,178,0.07);
+            --accent-hover: #5635a0;
+            --btn-bg: #643fb2;
+            --btn-hover: #5635a0;
+            --success: #0faa58;
+            --success-bg: rgba(15,170,88,0.07);
+            --warning: #d48806;
+            --warning-bg: rgba(212,136,6,0.07);
+            --error: #d13438;
+            --error-bg: rgba(209,52,56,0.07);
+            --shadow: 0 2px 8px rgba(0,0,0,0.06);
+            --sidebar-active: rgba(100,63,178,0.07);
+            --scrollbar: #c4c4c4;
+            --tag-bg: #e8e8ee;
+        }
+
+        /* ─── Reset ─── */
+        *{box-sizing:border-box;margin:0;padding:0}
+        html,body{height:100%}
+        body{font-family:var(--font);background:var(--bg-app);color:var(--text-1);overflow:hidden}
+
+        /* ─── Top Bar ─── */
+        .topbar{
+            position:fixed;top:0;left:0;right:0;z-index:100;
+            height:48px;background:var(--bg-topbar);
+            border-bottom:1px solid var(--border);
+            display:flex;align-items:center;padding:0 16px;gap:16px;
+        }
+        .topbar-brand{
+            display:flex;align-items:center;gap:10px;
+            font-size:15px;font-weight:600;color:var(--text-1);
+            white-space:nowrap;cursor:default;min-width:180px;
+        }
+        .topbar-brand svg{flex-shrink:0}
+
+        .topbar-end{display:flex;align-items:center;gap:12px;margin-left:auto}
+
+        /* Theme toggle */
+        .theme-toggle{
+            display:flex;align-items:center;gap:8px;cursor:pointer;
+            font-size:13px;color:var(--text-2);user-select:none;
+        }
+        .theme-track{
+            width:36px;height:20px;background:var(--accent);border-radius:10px;
+            position:relative;transition:background .2s;
+        }
+        .theme-thumb{
+            width:16px;height:16px;background:#fff;border-radius:50%;
+            position:absolute;top:2px;left:2px;transition:transform .2s;
+            box-shadow:0 1px 3px rgba(0,0,0,.3);
+        }
+        [data-theme="light"] .theme-thumb{transform:translateX(16px)}
+        .topbar-avatar{
+            width:32px;height:32px;border-radius:50%;background:var(--accent);
+            display:flex;align-items:center;justify-content:center;
+            color:#fff;font-size:13px;font-weight:600;
+        }
+
+        /* ─── Sidebar ─── */
+        .sidebar{
+            position:fixed;top:48px;left:0;bottom:0;width:200px;
+            background:var(--bg-sidebar);border-right:1px solid var(--border-subtle);
+            padding:12px 8px;overflow-y:auto;z-index:50;
+        }
+        .sidebar-item{
+            display:flex;align-items:center;gap:10px;
+            padding:8px 12px;border-radius:6px;
+            color:var(--text-2);font-size:13px;cursor:pointer;
+            transition:background .15s,color .15s;text-decoration:none;user-select:none;
+        }
+        .sidebar-item:hover{background:var(--bg-surface);color:var(--text-1)}
+        .sidebar-item.active{background:var(--sidebar-active);color:var(--accent);font-weight:600}
+        .sidebar-icon{width:18px;text-align:center;flex-shrink:0}
+
+        /* ─── Main ─── */
+        .main{
+            margin-left:200px;margin-top:48px;
+            height:calc(100vh - 48px);overflow-y:auto;padding:28px 32px;
+            scroll-padding-top:16px;
+        }
+        .page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;scroll-margin-top:16px}
+        .page-title{font-size:20px;font-weight:600;color:var(--text-1)}
+        .badge{
+            font-size:11px;font-weight:500;background:var(--accent-bg);color:var(--accent);
+            padding:2px 8px;border-radius:10px;margin-left:8px;vertical-align:middle;
+        }
+        .header-chips{
+            display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+            margin-bottom:20px;padding-bottom:12px;border-bottom:1px solid var(--border-subtle);
+        }
+        .chip{
+            display:flex;align-items:center;gap:6px;padding:6px 12px;
+            background:var(--bg-card);border:1px solid var(--border);
+            border-radius:6px;font-size:13px;color:var(--text-1);
+        }
+        .chip .lbl{color:var(--text-2);font-size:12px}
+
+        /* ─── KPI Agent Cards ─── */
+        .kpi-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px}
+        .kpi-card{
+            background:var(--bg-card);border:1px solid var(--border);
+            border-radius:10px;padding:20px;transition:box-shadow .2s;
+        }
+        .kpi-card:hover{box-shadow:var(--shadow)}
+        .kpi-header{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+        .kpi-title{font-size:22px;font-weight:700;color:var(--text-1)}
+        .kpi-value{font-size:13px;font-weight:600;color:var(--text-2);margin-bottom:2px}
+        .kpi-sub{font-size:12px;color:var(--text-3)}
+        .status{display:inline-block;width:20px;height:20px;border-radius:50%;flex-shrink:0}
+        .status.ok{background:var(--success)}
+        .status.err{background:var(--error)}
+        .status.loading{background:var(--warning)}
+        .otel-text{font-size:11px;color:var(--text-3);margin-top:4px}
+
+        /* ─── Config ─── */
+        .config-card{
+            background:var(--bg-card);border:1px solid var(--border);
+            border-radius:10px;padding:20px;margin-bottom:24px;
+        }
+        .config-card h3{font-size:14px;font-weight:600;color:var(--text-1);margin-bottom:16px}
+        .cfg-grid{
+            display:grid;grid-template-columns:auto 1fr 1fr 1fr;
+            gap:8px 12px;align-items:center;
+        }
+        .cfg-label{font-size:12px;font-weight:600;color:var(--text-2);white-space:nowrap}
+        .cfg-wrap{display:flex;gap:4px}
+        .cfg-wrap input{
+            flex:1;padding:8px 12px;border:1px solid var(--border);border-radius:6px;
+            background:var(--bg-input);color:var(--text-1);font-size:13px;
+            font-family:var(--font);outline:none;transition:border-color .15s;
+        }
+        .cfg-wrap input:focus{border-color:var(--accent)}
+        .cfg-wrap input[readonly]{color:var(--text-2);cursor:default}
+        .copy-btn{
+            padding:6px 10px;font-size:12px;background:var(--bg-surface);
+            border:1px solid var(--border);border-radius:6px;cursor:pointer;
+            color:var(--text-2);transition:background .15s;white-space:nowrap;
+        }
+        .copy-btn:hover{background:var(--bg-card-hover);color:var(--text-1)}
+        .token-row{
+            margin-top:12px;padding-top:12px;border-top:1px solid var(--border-subtle);
+            display:flex;align-items:center;gap:12px;
+        }
+
+        /* ─── Pipeline ─── */
+        .pipeline{margin-bottom:24px}
+        .pipeline h3{font-size:14px;font-weight:600;color:var(--text-1);margin-bottom:12px}
+        .pipeline-row{display:flex;gap:12px;margin-bottom:20px}
+        .pipeline-row input[type="text"]{
+            flex:1;padding:12px 16px;border:1px solid var(--border);border-radius:8px;
+            background:var(--bg-card);color:var(--text-1);font-size:14px;
+            font-family:var(--font);outline:none;transition:border-color .15s;
+        }
+        .pipeline-row input:focus{border-color:var(--accent)}
+        .pipeline-row input::placeholder{color:var(--text-3)}
+        .btn-primary{
+            background:var(--btn-bg);color:#fff;border:none;padding:12px 24px;
+            border-radius:8px;cursor:pointer;font-size:14px;font-weight:600;
+            font-family:var(--font);white-space:nowrap;transition:background .15s;
+            display:inline-flex;align-items:center;gap:6px;
+        }
+        .btn-primary:hover{background:var(--btn-hover)}
+        .btn-primary:disabled{opacity:.5;cursor:not-allowed}
+
+        /* ─── Steps ─── */
+        .step{
+            margin:8px 0;border:1px solid var(--border);border-radius:8px;
+            background:var(--bg-card);border-left:3px solid var(--accent);
+        }
+        .step.active{border-left-color:var(--warning);background:var(--warning-bg)}
+        .step.done{border-left-color:var(--success)}
+        .step>summary{
+            padding:12px 16px;cursor:pointer;list-style:revert;
+            font-size:14px;font-weight:500;color:var(--text-1);
+        }
+        .step>summary::-webkit-details-marker{color:var(--accent)}
+        .step>.step-content{padding:0 16px 16px 16px}
+
+        /* ─── Output / Markdown ─── */
+        .output{
+            background:var(--bg-surface);border:1px solid var(--border-subtle);
+            border-radius:8px;padding:16px;margin-top:12px;
+        }
+        .rendered-md{color:var(--text-2);line-height:1.7}
+        .rendered-md h1{color:var(--accent);font-size:1.5em;margin:16px 0 8px;border-bottom:1px solid var(--border-subtle);padding-bottom:4px}
+        .rendered-md h2{color:var(--accent-light);font-size:1.3em;margin:14px 0 6px}
+        .rendered-md h3{color:var(--accent);font-size:1.1em;margin:12px 0 4px}
+        .rendered-md h4{color:var(--text-1);font-size:1em;margin:10px 0 4px}
+        .rendered-md h5{color:var(--text-2);font-size:.95em;margin:8px 0 4px}
+        .rendered-md h6{color:var(--text-3);font-size:.9em;margin:8px 0 4px}
+        .rendered-md p{margin:8px 0}
+        .rendered-md ul,.rendered-md ol{margin:8px 0 8px 20px}
+        .rendered-md li{margin:4px 0}
+        .rendered-md code{background:var(--bg-code);padding:2px 6px;border-radius:3px;font-size:.9em}
+        .rendered-md pre{background:var(--bg-code);padding:12px;border-radius:6px;overflow-x:auto;margin:8px 0}
+        .rendered-md pre code{background:none;padding:0}
+        .rendered-md strong{color:var(--text-1)}
+        .rendered-md hr{border:none;border-top:1px solid var(--border-subtle);margin:12px 0}
+        .rendered-md a{color:var(--accent-light)}
+        .rendered-md table{border-collapse:collapse;width:100%;margin:12px 0}
+        .rendered-md th,.rendered-md td{border:1px solid var(--border);padding:8px 12px;text-align:left}
+        .rendered-md th{background:var(--bg-surface);color:var(--accent);font-weight:600}
+        .rendered-md tr:nth-child(even){background:var(--bg-surface)}
+        .social-table{width:100%;border-collapse:collapse;margin-top:8px}
+        .social-table th,.social-table td{border:1px solid var(--border);padding:8px 12px;text-align:left}
+        .social-table th{background:var(--bg-surface);color:var(--accent);font-size:13px;font-weight:600}
+        .social-table td{background:var(--bg-card);font-size:13px;color:var(--text-2)}
+        pre{white-space:pre-wrap;word-wrap:break-word;font-size:13px}
+
+        /* ─── Scrollbar ─── */
+        ::-webkit-scrollbar{width:8px;height:8px}
+        ::-webkit-scrollbar-track{background:transparent}
+        ::-webkit-scrollbar-thumb{background:var(--scrollbar);border-radius:4px}
+
+        /* ─── Responsive ─── */
+        @media(max-width:900px){
+            .sidebar{display:none}
+            .main{margin-left:0}
+            .kpi-grid{grid-template-columns:1fr}
+            .cfg-grid{grid-template-columns:auto 1fr}
+        }
+    </style>
+</head>
+<body>
+    <!-- ─── Top Bar ─── -->
+    <header class="topbar">
+        <div class="topbar-brand">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                <rect x="1" y="1" width="10" height="10" rx="2" fill="#643fb2"/>
+                <rect x="13" y="1" width="10" height="10" rx="2" fill="#8b6cc7" opacity=".7"/>
+                <rect x="1" y="13" width="10" height="10" rx="2" fill="#8b6cc7" opacity=".7"/>
+                <rect x="13" y="13" width="10" height="10" rx="2" fill="#643fb2"/>
+            </svg>
+            Agentic Content Factory with Azure Container Apps
+        </div>
+
+        <div class="topbar-end">
+            <label class="theme-toggle" id="themeToggle">
+                <span id="themeIcon">&#127769;</span>
+                <div class="theme-track"><div class="theme-thumb"></div></div>
+            </label>
+            <div class="topbar-avatar">User</div>
+        </div>
+    </header>
+
+    <!-- ─── Sidebar ─── -->
+    <aside class="sidebar">
+        <a class="sidebar-item active" href="#section-top" onclick="return navTo(this,'section-top')">
+            <span class="sidebar-icon">&#127968;</span> Top
+        </a>
+        <a class="sidebar-item" href="#section-blog" onclick="return navTo(this,'section-blog')">
+            <span class="sidebar-icon">&#128221;</span> Blog
+        </a>
+        <a class="sidebar-item" href="#section-social" onclick="return navTo(this,'section-social')">
+            <span class="sidebar-icon">&#128172;</span> Social
+        </a>
+        <a class="sidebar-item" href="#section-podcast" onclick="return navTo(this,'section-podcast')">
+            <span class="sidebar-icon">&#127897;&#65039;</span> Podcast
+        </a>
+    </aside>
+
+    <!-- ─── Main Content ─── -->
+    <div class="main">
+        <!-- Page Header -->
+        <div class="page-header" id="section-top">
+            <h1 class="page-title">
+                Agentic Content Factory - 3 Agents and 3 Agentic Harnesses
+                <span class="badge">Vibed w/Joy</span>
+            </h1>
+        </div>
+
+        <!-- Foundry-style chips -->
+        <div class="header-chips">
+            <div class="chip"><span class="lbl">Platform:</span> Azure Container Apps + Foundry</div>
+            <div class="chip"><span class="lbl">Protocol:</span> A2A (Agent-to-Agent)</div>
+            <div class="chip"><span class="lbl">Lab version:</span> 1.0.5.25.26</div>
+        </div>
+        <!-- KPI Agent Cards -->
+        <div class="kpi-grid">
+            <div class="kpi-card">
+                <div class="kpi-header">
+                    <span class="status loading" id="s1"></span>
+                    <span class="kpi-title">Agent 1: Researcher</span>
+                </div>
+                <div class="kpi-value" id="a1-status">Checking...</div>
+                <div class="kpi-sub">LangGraph / Python</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-header">
+                    <span class="status loading" id="s2"></span>
+                    <span class="kpi-title">Agent 2: Content Creator</span>
+                </div>
+                <div class="kpi-value" id="a2-status">Checking...</div>
+                <div class="kpi-sub">Microsoft Agent Framework / .NET</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-header">
+                    <span class="status loading" id="s3"></span>
+                    <span class="kpi-title">Agent 3: Podcaster</span>
+                </div>
+                <div class="kpi-value" id="a3-status">Checking...</div>
+                <div class="kpi-sub">GitHub Copilot SDK / Python</div>
+            </div>
+        </div>
+
+        <!-- Configuration -->
+        <details class="config-card" open>
+            <summary style="cursor:pointer;list-style:revert"><h3 style="display:inline;font-size:14px;font-weight:600;color:var(--text-1)">Agent Configuration</h3></summary>
+            <div class="cfg-grid" style="margin-top:16px">
+                <div class="cfg-label">URL</div>
+                <div class="cfg-wrap">
+                    <input type="text" id="agent1-url" readonly value="http://localhost:8001" />
+                    <button class="copy-btn" onclick="copyField('agent1-url')">&#128203;</button>
+                </div>
+                <div class="cfg-wrap">
+                    <input type="text" id="agent2-url" readonly value="http://localhost:8002" />
+                    <button class="copy-btn" onclick="copyField('agent2-url')">&#128203;</button>
+                </div>
+                <div class="cfg-wrap">
+                    <input type="text" id="agent3-url" readonly value="http://localhost:8003" />
+                    <button class="copy-btn" onclick="copyField('agent3-url')">&#128203;</button>
+                </div>
+
+                <div class="cfg-label">A2A Card</div>
+                <div class="cfg-wrap">
+                    <input type="text" id="agent1-card" readonly value="http://localhost:8001/.well-known/agent.json" style="cursor:pointer" onclick="window.open(this.value,'_blank')" />
+                    <button class="copy-btn" onclick="event.stopPropagation();copyField('agent1-card')">&#128203;</button>
+                </div>
+                <div class="cfg-wrap">
+                    <input type="text" id="agent2-card" readonly value="http://localhost:8002/.well-known/agent.json" style="cursor:pointer" onclick="window.open(this.value,'_blank')" />
+                    <button class="copy-btn" onclick="event.stopPropagation();copyField('agent2-card')">&#128203;</button>
+                </div>
+                <div class="cfg-wrap">
+                    <input type="text" id="agent3-card" readonly value="http://localhost:8003/.well-known/agent.json" style="cursor:pointer" onclick="window.open(this.value,'_blank')" />
+                    <button class="copy-btn" onclick="event.stopPropagation();copyField('agent3-card')">&#128203;</button>
+                </div>
+
+                <div class="cfg-label">OTel Agent ID</div>
+                <div class="cfg-wrap">
+                    <input type="text" id="a1-otel" readonly value="" placeholder="—" />
+                    <button class="copy-btn" onclick="copyField('a1-otel')">&#128203;</button>
+                </div>
+                <div class="cfg-wrap">
+                    <input type="text" id="a2-otel" readonly value="" placeholder="—" />
+                    <button class="copy-btn" onclick="copyField('a2-otel')">&#128203;</button>
+                </div>
+                <div class="cfg-wrap">
+                    <input type="text" id="a3-otel" readonly value="" placeholder="—" />
+                    <button class="copy-btn" onclick="copyField('a3-otel')">&#128203;</button>
+                </div>
+            </div>
+            <div class="token-row">
+                <div class="cfg-label" id="token-label">&#128273; A2A Token</div>
+                <div class="cfg-wrap" style="flex:1">
+                    <input type="password" id="a2a-token" value="__A2A_TOKEN__" placeholder="Leave empty for local dev (no auth)" />
+                    <button class="copy-btn" onclick="copyField('a2a-token')">&#128203;</button>
+                </div>
+                <button class="copy-btn" id="copyConfigBtn" onclick="copyDevUiConfig()" style="padding:8px 14px;font-size:12px;white-space:nowrap">&#128230; Copy DevUI Config</button>
+            </div>
+            <div class="token-row" style="margin-top:12px">
+                <div class="cfg-label">&#128737; Research Mode</div>
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--text-2)">
+                    <input type="checkbox" id="use-sandboxes" checked style="width:16px;height:16px;accent-color:var(--accent)" />
+                    Use ACA Sandboxes <span style="font-size:11px;color:var(--text-3)">(isolated content retrieval with egress policies)</span>
+                </label>
+            </div>
+        </details>
+
+        <!-- Pipeline -->
+        <div class="pipeline">
+            <h3>What do you want me to create content about and for what audience?</h3>
+            <div class="pipeline-row">
+                <input type="text" id="topic" placeholder="Enter a technology topic (e.g., Write a blog post about Azure Container Apps for developers)" />
+                <button class="btn-primary" id="run" onclick="runPipeline()">&#9654; Run Pipeline</button>
+            </div>
+            <div id="steps"></div>
+        </div>
+
+
+    </div>
+
+    <script>
+        /* ═══ Theme Toggle ═══ */
+        (function initTheme() {
+            var saved = localStorage.getItem('foundry-theme');
+            var theme = saved || 'dark';
+            document.documentElement.setAttribute('data-theme', theme);
+            updateThemeIcon(theme);
+        })();
+
+        document.getElementById('themeToggle').addEventListener('click', function() {
+            var cur = document.documentElement.getAttribute('data-theme');
+            var next = cur === 'dark' ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', next);
+            localStorage.setItem('foundry-theme', next);
+            updateThemeIcon(next);
+        });
+
+        function updateThemeIcon(theme) {
+            document.getElementById('themeIcon').innerHTML = theme === 'dark' ? '&#127769;' : '&#9728;&#65039;';
+        }
+
+        /* ═══ Sidebar navigation ═══ */
+        function navTo(el, id) {
+            document.querySelectorAll('.sidebar-item').forEach(function(i){ i.classList.remove('active'); });
+            el.classList.add('active');
+            var main = document.querySelector('.main');
+            if (id === 'section-top') {
+                main.scrollTo({ top: 0, behavior: 'smooth' });
+            } else {
+                var target = document.getElementById(id);
+                if (target) {
+                    // Expand any collapsed <details> ancestors
+                    var node = target;
+                    while (node && node !== main) {
+                        if (node.tagName === 'DETAILS' && !node.open) {
+                            node.open = true;
+                        }
+                        node = node.parentElement;
+                    }
+                    // Also expand if the target itself is a <details>
+                    if (target.tagName === 'DETAILS' && !target.open) {
+                        target.open = true;
+                    }
+                    // Small delay to let layout recalc after expanding
+                    setTimeout(function() {
+                        main.scrollTo({ top: target.offsetTop - main.offsetTop, behavior: 'smooth' });
+                    }, 50);
+                }
+            }
+            return false;
+        }
+        function activateSidebar(el) {
+            document.querySelectorAll('.sidebar-item').forEach(function(i){ i.classList.remove('active'); });
+            el.classList.add('active');
+        }
+
+        /* ═══ Clipboard helper ═══ */
+        function copyField(id) {
+            var val = document.getElementById(id).value;
+            navigator.clipboard.writeText(val).then(function() {
+                var btn = document.getElementById(id).closest('div').querySelector('button');
+                var orig = btn.textContent;
+                btn.textContent = '\u2705';
+                setTimeout(function(){ btn.textContent = orig; }, 1500);
+            });
+        }
+
+        function getAgent1Url() { return document.getElementById('agent1-url').value.trim(); }
+        function getAgent2Url() { return document.getElementById('agent2-url').value.trim(); }
+        function getAgent3Url() { return document.getElementById('agent3-url').value.trim(); }
+
+        function copyDevUiConfig() {
+            var cfg = {
+                a1: getAgent1Url(),
+                a2: getAgent2Url(),
+                a3: getAgent3Url(),
+                tk: document.getElementById('a2a-token').value.trim()
+            };
+            var encoded = btoa(JSON.stringify(cfg));
+            navigator.clipboard.writeText(encoded).then(function() {
+                var btn = document.getElementById('copyConfigBtn');
+                btn.innerHTML = '\u2705 Copied!';
+                setTimeout(function(){ btn.innerHTML = '\uD83D\uDCE6 Copy DevUI Config'; }, 2000);
+            });
+        }
+
+        function getAuthHeaders() {
+            var token = document.getElementById('a2a-token').value.trim();
+            var h = { 'Content-Type': 'application/json' };
+            if (token) h['Authorization'] = 'Bearer ' + token;
+            return h;
+        }
+
+        // Bootstrap: clear placeholder for local dev, show indicator when token was injected by infra
+        document.addEventListener('DOMContentLoaded', function() {
+            var el = document.getElementById('a2a-token');
+            var val = el.value.trim();
+            if (val === ('__A2A' + '_TOKEN__') || val === '') {
+                el.value = '';
+            } else {
+                var label = document.getElementById('token-label');
+                label.textContent = '\uD83D\uDD11 A2A Token \u2705';
+                label.title = 'Token auto-populated from infrastructure';
+            }
+        });
+
+        async function checkHealth() {
+            for (var _i = 0, _a = [[getAgent1Url(), 'a1-status', 's1', 'a1-otel'], [getAgent2Url(), 'a2-status', 's2', 'a2-otel'], [getAgent3Url(), 'a3-status', 's3', 'a3-otel']]; _i < _a.length; _i++) {
+                var _b = _a[_i], url = _b[0], id = _b[1], statusId = _b[2], otelId = _b[3];
+                try {
+                    var r = await fetch(url + '/health');
+                    var d = await r.json();
+                    document.getElementById(id).textContent = d.status === 'healthy' ? 'Healthy' : 'Error';
+                    document.getElementById(statusId).className = 'status ' + (d.status === 'healthy' ? 'ok' : 'err');
+                    document.getElementById(otelId).value = d.agent || '';
+                } catch(e) {
+                    document.getElementById(id).textContent = 'Unreachable';
+                    document.getElementById(statusId).className = 'status err';
+                    document.getElementById(otelId).value = '';
+                }
+            }
+        }
+
+        function addStep(text, state) {
+            var el = document.getElementById('steps');
+            var details = document.createElement('details');
+            details.className = 'step ' + state;
+            details.open = true;
+            details.id = 'step-' + el.children.length;
+            var summary = document.createElement('summary');
+            summary.textContent = text;
+            details.appendChild(summary);
+            var content = document.createElement('div');
+            content.className = 'step-content';
+            details.appendChild(content);
+            el.appendChild(details);
+            return details;
+        }
+
+        function updateStep(div, text, state) {
+            div.querySelector('summary').textContent = text;
+            div.className = 'step ' + state;
+        }
+
+        var _pipelineTopic = '';
+        var _researchBrief = null;
+
+        async function runPipeline() {
+            var topic = document.getElementById('topic').value.trim();
+            if (!topic) return alert('Enter a topic');
+
+            document.getElementById('run').disabled = true;
+            document.getElementById('steps').innerHTML = '';
+
+            // Step 1: Research with simulated progress
+            var s1 = addStep('Agent 1: Researching "' + topic + '"...', 'active');
+            try {
+                var useSandboxes = document.getElementById('use-sandboxes').checked;
+                var a1StepMessages = [
+                    'Agent 1: Searching Microsoft Learn...',
+                    'Agent 1: Searching GitHub Azure-Samples...',
+                    'Agent 1: Searching Azure Blog & Tech Community...',
+                    'Agent 1: Ranking sources by relevance (LLM)...'
+                ];
+                if (useSandboxes) {
+                    a1StepMessages.push(
+                        'Agent 1: Creating ACA Sandboxes (python-3.12)...',
+                        'Agent 1: Configuring egress policies per domain...',
+                        'Agent 1: Installing dependencies in sandboxes...',
+                        'Agent 1: Fetching content in isolated sandboxes...',
+                        'Agent 1: Checking egress violations (bing.com blocked)...',
+                        'Agent 1: Collecting sandbox results...',
+                        'Agent 1: Extracting linked references...',
+                        'Agent 1: Synthesizing research brief...'
+                    );
+                } else {
+                    a1StepMessages.push(
+                        'Agent 1: Fetching full content from top sources...',
+                        'Agent 1: Synthesizing research brief...'
+                    );
+                }
+                var a1StepIdx = 0;
+                var a1Progress = setInterval(function() {
+                    if (a1StepIdx < a1StepMessages.length) {
+                        updateStep(s1, a1StepMessages[a1StepIdx], 'active');
+                        a1StepIdx++;
+                    }
+                }, 4000);
+
+                // Live sandbox status polling (shows tiles before brief is ready)
+                var liveSandboxDiv = null;
+                var statusPoller = null;
+                if (useSandboxes) {
+                    liveSandboxDiv = document.createElement('div');
+                    liveSandboxDiv.className = 'output';
+                    liveSandboxDiv.style.display = 'block';
+                    liveSandboxDiv.innerHTML = formatSandboxTiles([
+                        { domain: 'learn.microsoft.com', status: 'active', urls_count: 0, allowed_domains: ['learn.microsoft.com'], egress_denied: [] },
+                        { domain: 'azure.microsoft.com', status: 'active', urls_count: 0, allowed_domains: ['azure.microsoft.com'], egress_denied: [] },
+                        { domain: 'github.com', status: 'active', urls_count: 0, allowed_domains: ['github.com'], egress_denied: [] }
+                    ], []);
+                    s1.querySelector('.step-content').appendChild(liveSandboxDiv);
+                    statusPoller = setInterval(async function() {
+                        try {
+                            var sr = await fetch(getAgent1Url() + '/status');
+                            if (!sr.ok) return;
+                            var st = await sr.json();
+                            if (st.sandbox_statuses && st.sandbox_statuses.length > 0) {
+                                liveSandboxDiv.innerHTML = formatSandboxTiles(st.sandbox_statuses, st.egress_violations || []);
+                                var finishedCount = st.sandbox_statuses.filter(function(sb){ return sb.progress_state === 'finished'; }).length;
+                                updateStep(s1, 'Agent 1: Running sandboxes... (' + finishedCount + '/' + st.sandbox_statuses.length + ' finished)', 'active');
+                            }
+                            if (st.phase === 'sandboxes_complete' || st.phase === 'synthesizing') {
+                                liveSandboxDiv.innerHTML = formatSandboxTiles(st.sandbox_statuses, st.egress_violations);
+                                updateStep(s1, 'Agent 1: Sandboxes complete — synthesizing brief...', 'active');
+                                clearInterval(statusPoller);
+                                statusPoller = null;
+                            }
+                        } catch(e) {}
+                    }, 1500);
+                }
+
+                _pipelineTopic = topic;
+                var r1 = await fetch(getAgent1Url() + '/a2a', {
+                    method: 'POST',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify({
+                        jsonrpc: '2.0',
+                        method: 'tasks/send',
+                        params: { id: 'task-001', message: { parts: [{ kind: 'text', text: topic }, { kind: 'data', data: { topic: topic, use_sandboxes: useSandboxes } }] } },
+                        id: 'req-001'
+                    })
+                });
+                if (!r1.ok) throw new Error('Agent 1 returned HTTP ' + r1.status);
+                var d1 = await r1.json();
+                if (d1.error) throw new Error('Agent 1 error: ' + (d1.error.message || JSON.stringify(d1.error)));
+                var brief = d1.result?.artifacts?.[0]?.parts?.[0]?.data;
+                _researchBrief = brief;
+                clearInterval(a1Progress);
+                if (statusPoller) { clearInterval(statusPoller); statusPoller = null; }
+                var sandboxInfo = '';
+                if (brief?.sandbox_mode && brief?.sandbox_results) {
+                    var sbCount = brief.sandbox_results.length;
+                    var blocked = brief.sandbox_results.filter(function(s){ return s.egress_blocked; }).length;
+                    sandboxInfo = ' | ' + sbCount + ' sandbox(es)';
+                    if (blocked > 0) sandboxInfo += ', ' + blocked + ' egress blocked';
+                }
+                updateStep(s1, 'Agent 1: Research complete (' + (brief?.total_sources || 0) + ' sources, ' + (brief?.sources_with_content || 0) + ' with full content' + sandboxInfo + ')', 'done');
+
+                // Show research brief inside Agent 1's collapsible section
+                // Always show sandbox tiles FIRST, then brief below
+                if (brief?.sandbox_mode && brief?.sandbox_results && brief.sandbox_results.length > 0) {
+                    if (liveSandboxDiv) {
+                        // Update existing live div with final data
+                        liveSandboxDiv.innerHTML = formatSandboxTiles(brief.sandbox_results, brief.egress_violations);
+                    } else {
+                        // Poller never fired — create sandbox div now
+                        liveSandboxDiv = document.createElement('div');
+                        liveSandboxDiv.className = 'output';
+                        liveSandboxDiv.style.display = 'block';
+                        liveSandboxDiv.innerHTML = formatSandboxTiles(brief.sandbox_results, brief.egress_violations);
+                        s1.querySelector('.step-content').appendChild(liveSandboxDiv);
+                    }
+                }
+                var briefDiv = document.createElement('div');
+                briefDiv.className = 'output';
+                briefDiv.style.display = 'block';
+                briefDiv.innerHTML = '<div id="section-blog"></div><h3 style="color:var(--accent);margin-bottom:8px">Research Brief</h3>' +
+                    formatBrief(brief);
+                s1.querySelector('.step-content').appendChild(briefDiv);
+
+                // Step 2: Fan out to Agent 2 (content) and Agent 3 (podcast) in parallel
+                var s2 = addStep('Agent 2: Creating content...', 'active');
+                var s3 = addStep('Agent 3: Generating podcast...', 'active');
+
+                // Agent 2 progress simulation
+                var a2StepMessages = [
+                    'Agent 2: Extracting source materials...',
+                    'Agent 2: Compiling article with Azure OpenAI...',
+                    'Agent 2: Writing original content from sources...',
+                    'Agent 2: Generating social media content...',
+                    'Agent 2: Finalizing content package...'
+                ];
+                var a2StepIdx = 0;
+                var a2Progress = setInterval(function() {
+                    if (a2StepIdx < a2StepMessages.length) {
+                        updateStep(s2, a2StepMessages[a2StepIdx], 'active');
+                        a2StepIdx++;
+                    }
+                }, 8000);
+
+                // Launch Agent 2 (sync A2A call)
+                var agent2Promise = fetch(getAgent2Url() + '/a2a', {
+                    method: 'POST',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify({
+                        jsonrpc: '2.0',
+                        method: 'tasks/send',
+                        params: { id: 'task-002', message: { parts: [{ kind: 'data', data: { research_brief: brief } }] } },
+                        id: 'req-002'
+                    })
+                }).then(function(r){ return r.json(); });
+
+                // Launch Agent 3 (async: POST returns 202 + task_id, then poll)
+                var agent3Promise = (async function() {
+                    try {
+                        var r3 = await fetch(getAgent3Url() + '/a2a', {
+                            method: 'POST',
+                            headers: getAuthHeaders(),
+                            body: JSON.stringify({
+                                jsonrpc: '2.0',
+                                method: 'tasks/send',
+                                params: { id: 'task-003', message: { parts: [{ kind: 'data', data: { research_brief: brief } }] } },
+                                id: 'req-003'
+                            })
+                        });
+                        var d3 = await r3.json();
+                        var taskId = d3.task_id;
+                        if (!taskId) throw new Error('No task_id in response');
+
+                        // Poll for completion (max ~10 min)
+                        var pollUrl = getAgent3Url() + '/tasks/' + taskId;
+                        var maxPolls = 200;
+                        var pollCount = 0;
+                        while (pollCount < maxPolls) {
+                            pollCount++;
+                            await new Promise(function(resolve){ setTimeout(resolve, 3000); });
+                            var pollResp = await fetch(pollUrl, { headers: getAuthHeaders() });
+                            var pollData = await pollResp.json();
+
+                            if (pollData.progress) {
+                                var progressMsg = pollData.progress.replace(/_/g, ' ');
+                                updateStep(s3, 'Agent 3: ' + progressMsg + '...', 'active');
+                            }
+
+                            if (pollData.status === 'completed') {
+                                return pollData.result;
+                            } else if (pollData.status === 'failed') {
+                                throw new Error(pollData.error || 'Podcast generation failed');
+                            }
+                        }
+                        throw new Error('Podcast generation timed out after 10 minutes');
+                    } catch (err) {
+                        updateStep(s3, 'Agent 3: Error - ' + err.message, 'active');
+                        return null;
+                    }
+                })();
+
+                // Wait for Agent 2 (usually completes first)
+                var d2 = await agent2Promise;
+                var content = d2.result?.artifacts?.[0]?.parts?.[0]?.data;
+                clearInterval(a2Progress);
+                updateStep(s2, 'Agent 2: Content package created', 'done');
+
+                // Show Agent 2 content inside its collapsible section
+                var contentDiv = document.createElement('div');
+                contentDiv.className = 'output';
+                contentDiv.style.display = 'block';
+                var pkg = content?.content_package;
+                if (pkg) {
+                    contentDiv.innerHTML = formatContent(pkg);
+                } else {
+                    contentDiv.innerHTML = '<pre>' + escHtml(JSON.stringify(content, null, 2)) + '</pre>';
+                }
+                s2.querySelector('.step-content').appendChild(contentDiv);
+
+                // Wait for Agent 3 (may take longer due to TTS)
+                var podcastResult = await agent3Promise;
+                if (podcastResult?.podcast) {
+                    updateStep(s3, 'Agent 3: Podcast ready (' + podcastResult.podcast.turn_count + ' turns)', 'done');
+                    // Show podcast inside Agent 3's collapsible section
+                    var podcastDiv = document.createElement('div');
+                    podcastDiv.innerHTML = formatPodcast(podcastResult.podcast);
+                    s3.querySelector('.step-content').appendChild(podcastDiv);
+                } else if (!s3.className.includes('active')) {
+                    // Error was already shown
+                } else {
+                    updateStep(s3, 'Agent 3: Podcast unavailable', 'active');
+                }
+
+            } catch (err) {
+                addStep('Error: ' + err.message, 'active');
+            }
+
+            document.getElementById('run').disabled = false;
+        }
+
+        function formatSandboxTiles(sandboxStatuses, egressViolations) {
+            if (!sandboxStatuses || sandboxStatuses.length === 0) return '';
+            var html = '<div style="margin:8px 0">';
+            html += '<h4 style="color:var(--accent-light);margin-bottom:8px;font-size:13px">&#128230; ACA Sandboxes</h4>';
+            html += '<div style="display:flex;gap:10px;flex-wrap:wrap">';
+            sandboxStatuses.forEach(function(sb) {
+                var isRunning = sb.progress_state === 'running' || sb.status === 'active';
+                var isFinished = sb.progress_state === 'finished' || sb.status === 'success' || sb.status === 'egress_blocked' || sb.status === 'fallback' || sb.status === 'create_failed' || sb.status === 'exec_error' || sb.status === 'failed';
+                var color = isRunning ? 'var(--accent-light)' : (sb.status === 'success' ? 'var(--success)' : sb.status === 'egress_blocked' ? 'var(--warning)' : 'var(--error)');
+                var bgColor = isRunning ? 'var(--accent-bg)' : (sb.status === 'success' ? 'var(--success-bg)' : sb.status === 'egress_blocked' ? 'var(--warning-bg)' : 'var(--error-bg)');
+                var icon = isRunning ? '&#9203;' : (sb.status === 'success' ? '&#9989;' : sb.status === 'egress_blocked' ? '&#128683;' : '&#10060;');
+                var statusLabel = isRunning ? 'Running' : (isFinished ? 'Finished' : 'Pending');
+                html += '<div style="background:' + bgColor + ';border:1px solid ' + color + ';border-radius:8px;padding:12px 16px;min-width:180px;flex:1;max-width:300px">';
+                html += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px"><span style="font-size:14px">' + icon + '</span><span style="font-size:13px;font-weight:600;color:' + color + '">' + statusLabel + '</span></div>';
+                html += '<div style="font-size:12px;color:var(--text-2);font-weight:500">' + escHtml(sb.domain || 'unknown') + '</div>';
+                if (sb.sandbox_id) {
+                    html += '<div style="font-size:10px;color:var(--text-3);margin-top:2px;font-family:monospace;word-break:break-all" title="Sandbox ID">ID: ' + escHtml(sb.sandbox_id) + '</div>';
+                }
+                html += '<div style="font-size:11px;color:var(--text-3);margin-top:2px">State: ' + (isRunning ? 'Running' : (isFinished ? 'Finished' : 'Pending')) + '</div>';
+                html += '<div style="font-size:11px;color:var(--text-3);margin-top:4px">' + (sb.urls_count || 0) + ' URLs fetched</div>';
+                if (sb.allowed_domains && sb.allowed_domains.length > 0) {
+                    html += '<div style="font-size:10px;color:var(--success);margin-top:4px">&#128274; Egress: ' + sb.allowed_domains.join(', ') + '</div>';
+                }
+                if (sb.egress_denied && sb.egress_denied.length > 0) {
+                    sb.egress_denied.forEach(function(denied) {
+                        html += '<div style="font-size:10px;color:var(--error);margin-top:2px">&#128683; DENIED: ' + escHtml(denied) + '</div>';
+                    });
+                }
+                if (sb.error) html += '<div style="font-size:10px;color:var(--error);margin-top:2px;word-break:break-all">' + escHtml(sb.error).substring(0, 80) + '</div>';
+                html += '</div>';
+            });
+            html += '</div></div>';
+            // Egress violations alert
+            if (egressViolations && egressViolations.length > 0) {
+                html += '<div style="margin:8px 0;padding:12px 16px;background:var(--error-bg);border:1px solid var(--error);border-radius:8px">';
+                html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span style="font-size:16px">&#128683;</span><span style="font-size:13px;font-weight:600;color:var(--error)">Egress Policy Violations</span></div>';
+                egressViolations.forEach(function(v) {
+                    html += '<div style="font-size:12px;color:var(--text-2);margin:4px 0;padding:4px 8px;background:var(--bg-surface);border-radius:4px">';
+                    html += '<strong style="color:var(--error)">BLOCKED:</strong> <code style="color:var(--warning)">' + escHtml(v.blocked_host || '') + '</code> from sandbox <code>' + escHtml(v.domain || '') + '</code>';
+                    html += '</div>';
+                });
+                html += '</div>';
+            }
+            return html;
+        }
+
+        function formatBrief(brief) {
+            if (!brief) return '<p>No research data</p>';
+            var html = '';
+            if (brief.summary) html += '<p style="color:var(--text-2);margin-bottom:8px">' + brief.summary + '</p>';
+
+            // Sandbox tiles are shown in the live sandbox div (above), not duplicated here
+
+            var counts = brief.source_counts || {};
+            var sources = brief.sources || [];
+            var docCount = counts.documentation ?? sources.filter(function(s){ return s.type === 'documentation'; }).length;
+            var blogCount = counts.blog ?? sources.filter(function(s){ return s.type === 'blog'; }).length;
+            var repoCount = counts.code_sample ?? sources.filter(function(s){ return s.type === 'code_sample'; }).length;
+            var updateCount = counts.update ?? sources.filter(function(s){ return s.type === 'update'; }).length;
+            var linkedCount = counts.linked_reference ?? sources.filter(function(s){ return s.type === 'linked_reference'; }).length;
+
+            html += '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px">';
+            if (docCount) html += '<span style="background:var(--tag-bg);padding:6px 12px;border-radius:16px;color:var(--accent);font-size:13px">\uD83D\uDCC4 Microsoft Learn (' + docCount + ')</span>';
+            if (blogCount) html += '<span style="background:var(--tag-bg);padding:6px 12px;border-radius:16px;color:var(--accent);font-size:13px">\uD83D\uDCDD Azure Blog & Tech Community (' + blogCount + ')</span>';
+            if (repoCount) html += '<span style="background:var(--tag-bg);padding:6px 12px;border-radius:16px;color:var(--accent);font-size:13px">\uD83D\uDCBB GitHub Repos (' + repoCount + ')</span>';
+            if (updateCount) html += '<span style="background:var(--tag-bg);padding:6px 12px;border-radius:16px;color:var(--accent);font-size:13px">\uD83D\uDD04 Azure Updates (' + updateCount + ')</span>';
+            if (linkedCount) html += '<span style="background:var(--tag-bg);padding:6px 12px;border-radius:16px;color:var(--accent);font-size:13px">\uD83D\uDD17 Linked References (' + linkedCount + ')</span>';
+            html += '</div>';
+            return html;
+        }
+
+        function renderMarkdown(md) {
+            md = md.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+            var codeBlocks = [];
+            var processed = md.replace(/^[ \t]*`{3,}[ \t]*(\w*)[ \t]*\n([\s\S]*?)^[ \t]*`{3,}[ \t]*$/gm, function(_, lang, code) {
+                var idx = codeBlocks.length;
+                codeBlocks.push('<pre><code>' + code.replace(/\n$/, '') + '</code></pre>');
+                return '\x00CODEBLOCK' + idx + '\x00';
+            });
+            var html = processed
+                .replace(/^###### (.+)$/gm, '<h6>$1</h6>')
+                .replace(/^##### (.+)$/gm, '<h5>$1</h5>')
+                .replace(/^#### (.+)$/gm, '<h4>$1</h4>')
+                .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+                .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+                .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+                .replace(/^---$/gm, '<hr>')
+                .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\*(.+?)\*/g, '<em>$1</em>')
+                .replace(/`([^`]+)`/g, '<code>$1</code>')
+                .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>')
+                .replace(/^- (.+)$/gm, '<li>$1</li>')
+                .replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>');
+            // Render markdown tables
+            html = html.replace(/(^\|.+\|\s*\n)+/gm, function(tableBlock) {
+                var rows = tableBlock.trim().split('\n');
+                if (rows.length < 2) return tableBlock;
+                var parseRow = function(r){ return r.replace(/^\|/, '').replace(/\|\s*$/, '').split('|').map(function(c){ return c.trim(); }); };
+                var headerCells = parseRow(rows[0]);
+                var isSep = /^[\s|:-]+$/.test(rows[1]);
+                if (!isSep) return tableBlock;
+                var t = '<table><thead><tr>' + headerCells.map(function(c){ return '<th>' + c + '</th>'; }).join('') + '</tr></thead><tbody>';
+                for (var i = 2; i < rows.length; i++) {
+                    var cells = parseRow(rows[i]);
+                    t += '<tr>' + cells.map(function(c){ return '<td>' + c + '</td>'; }).join('') + '</tr>';
+                }
+                t += '</tbody></table>';
+                return t;
+            });
+            html = html.split('\n').map(function(line) {
+                var trimmed = line.trim();
+                if (!trimmed) return '';
+                if (/^<(h[1-6]|hr|ul|ol|li|pre|div|details|p|table|thead|tbody|tr|th|td)/.test(trimmed)) return line;
+                if (/\x00CODEBLOCK\d+\x00/.test(trimmed)) return line;
+                return '<p>' + line + '</p>';
+            }).join('\n');
+            html = html.replace(/\x00CODEBLOCK(\d+)\x00/g, function(_, idx){ return codeBlocks[parseInt(idx)]; });
+            return html;
+        }
+
+        var _rawBlogMarkdown = '';
+        var _socialData = null;
+
+        function formatContent(pkg) {
+            var html = '<div id="section-social"></div><h3 style="color:var(--accent);margin-bottom:8px">Generated Content Package</h3>';
+            if (pkg.blog_post) {
+                _rawBlogMarkdown = pkg.blog_post.markdown || '';
+                html += '<details open style="margin:12px 0 4px">';
+                html += '<summary style="color:var(--accent);cursor:pointer;list-style:revert">';
+                html += '<span style="display:inline-flex;align-items:center;justify-content:space-between;width:calc(100% - 20px)">';
+                html += '<span>Blog Post (' + (pkg.blog_post.word_count || 0) + ' words)</span>';
+                html += '<button onclick="event.stopPropagation();copyBlogContent()" id="copyBlogBtn" style="background:var(--btn-bg);color:#fff;border:none;padding:6px 14px;border-radius:4px;cursor:pointer;font-size:13px;display:inline-flex;align-items:center;gap:4px">\uD83D\uDCCB Copy</button>';
+                html += '</span></summary>';
+                html += '<div id="blogContent" class="rendered-md" style="border:1px solid var(--border);padding:12px;border-radius:4px;max-height:500px;overflow-y:auto;margin-top:8px">' + renderMarkdown(escHtml(_rawBlogMarkdown)) + '</div>';
+                html += '</details>';
+            }
+            if (pkg.social?.linkedin || pkg.social?.twitter_thread) {
+                _socialData = pkg.social;
+                html += '<div style="display:flex;align-items:center;justify-content:space-between;margin:16px 0 4px">';
+                html += '<h4 style="color:var(--accent-light);margin:0">Social Posts</h4>';
+                html += '<div style="display:flex;gap:8px">';
+                html += '<button onclick="copySocialJsonl()" id="copySocialBtn" style="background:var(--btn-bg);color:#fff;border:none;padding:6px 14px;border-radius:4px;cursor:pointer;font-size:13px;display:flex;align-items:center;gap:4px">\uD83D\uDCCB Copy as JSONL for Evals</button>';
+                html += '<button onclick="downloadSocialJsonl()" id="dlSocialBtn" style="background:var(--btn-bg);color:#fff;border:none;padding:6px 14px;border-radius:4px;cursor:pointer;font-size:13px;display:flex;align-items:center;gap:4px">\u2B07\uFE0F Download Evals.JSONL</button>';
+                html += '</div>';
+                html += '</div>';
+                html += '<table class="social-table"><thead><tr><th>Platform</th><th>Content</th></tr></thead><tbody>';
+                var postNum = 1;
+                if (pkg.social.linkedin) {
+                    html += '<tr><td style="white-space:nowrap">Post ' + postNum++ + '</td><td>' + escHtml(pkg.social.linkedin.text) + '</td></tr>';
+                }
+                if (pkg.social.twitter_thread) {
+                    pkg.social.twitter_thread.forEach(function(t) {
+                        html += '<tr><td style="white-space:nowrap">Post ' + postNum++ + '</td><td>' + escHtml(t) + '</td></tr>';
+                    });
+                }
+                html += '</tbody></table>';
+            }
+            if (pkg.demo_project?.files) {
+                html += '<h4 style="color:var(--accent-light);margin:12px 0 4px">Demo Project Files</h4>';
+                Object.entries(pkg.demo_project.files).forEach(function(entry) {
+                    var name = entry[0], content = entry[1];
+                    html += '<details style="margin:4px 0"><summary style="color:var(--accent);cursor:pointer">' + name + '</summary><pre style="white-space:pre-wrap;color:var(--text-2);padding:8px">' + escHtml(content) + '</pre></details>';
+                });
+            }
+            return html;
+        }
+
+        function copyBlogContent() {
+            if (!_rawBlogMarkdown) return;
+            navigator.clipboard.writeText(_rawBlogMarkdown).then(function() {
+                var btn = document.getElementById('copyBlogBtn');
+                btn.textContent = '\u2705 Copied!';
+                setTimeout(function(){ btn.innerHTML = '\uD83D\uDCCB Copy as .md'; }, 2000);
+            });
+        }
+
+        function copySocialJsonl() {
+            if (!_socialData || !_rawBlogMarkdown) return;
+            var audience = _researchBrief?.audience || 'technical professionals';
+            var query = 'Engaging and grounded social post on ' + _pipelineTopic + ' for ' + audience;
+            var context = _rawBlogMarkdown;
+
+            var posts = [];
+            if (_socialData.linkedin?.text) posts.push(_socialData.linkedin.text);
+            if (_socialData.twitter_thread) _socialData.twitter_thread.forEach(function(t){ posts.push(t); });
+
+            var lines = posts.map(function(post){ return JSON.stringify({ query: query, response: post, context: context }); });
+            navigator.clipboard.writeText(lines.join('\n')).then(function() {
+                var btn = document.getElementById('copySocialBtn');
+                btn.textContent = '\u2705 Copied!';
+                setTimeout(function(){ btn.innerHTML = '\uD83D\uDCCB Copy as JSONL for Evaluations'; }, 2000);
+            });
+        }
+
+        function downloadSocialJsonl() {
+            if (!_socialData || !_rawBlogMarkdown) return;
+            var audience = _researchBrief?.audience || 'technical professionals';
+            var query = 'Engaging and grounded social post on ' + _pipelineTopic + ' for ' + audience;
+            var context = _rawBlogMarkdown;
+
+            var posts = [];
+            if (_socialData.linkedin?.text) posts.push(_socialData.linkedin.text);
+            if (_socialData.twitter_thread) _socialData.twitter_thread.forEach(function(t){ posts.push(t); });
+
+            var lines = posts.map(function(post){ return JSON.stringify({ query: query, response: post, context: context }); });
+            var blob = new Blob([lines.join('\n')], { type: 'application/jsonl' });
+            var a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'Evals.JSONL';
+            a.click();
+            URL.revokeObjectURL(a.href);
+            var btn = document.getElementById('dlSocialBtn');
+            btn.textContent = '\u2705 Downloaded!';
+            setTimeout(function(){ btn.innerHTML = '\u2B07\uFE0F Download Evals.JSONL'; }, 2000);
+        }
+
+        function formatPodcast(podcast) {
+            var html = '<div id="section-podcast" style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border-subtle)">';
+            html += '<h3 style="color:var(--accent);margin-bottom:12px">\uD83C\uDF99\uFE0F Podcast: ' + escHtml(podcast.topic || '') + '</h3>';
+
+            if (podcast.audio_url) {
+                html += '<div style="background:var(--bg-surface);padding:16px;border-radius:8px;margin-bottom:12px">';
+                html += '<audio controls style="width:100%" src="' + escHtml(podcast.audio_url) + '"></audio>';
+                html += '<p style="color:var(--text-3);font-size:12px;margin-top:8px">' + Math.round(podcast.duration_seconds || 0) + ' seconds \u00B7 ' + (podcast.turn_count || 0) + ' turns</p>';
+                html += '</div>';
+            } else {
+                html += '<p style="color:var(--warning)">\u26A0\uFE0F Audio not available (blob upload may have failed)</p>';
+            }
+
+            html += '<details style="margin-top:8px"><summary style="color:var(--accent);cursor:pointer">\uD83D\uDCDD View Transcript</summary>';
+            html += '<div style="max-height:300px;overflow-y:auto;padding:8px">';
+            if (podcast.transcript) {
+                podcast.transcript.forEach(function(turn) {
+                    var color = turn.speaker === 'host' ? 'var(--accent)' : 'var(--success)';
+                    var label = turn.speaker === 'host' ? '\uD83C\uDF99 Host' : '\uD83C\uDF93 Guest';
+                    html += '<p style="margin:6px 0"><strong style="color:' + color + '">' + label + ':</strong> <span style="color:var(--text-2)">' + escHtml(turn.text) + '</span></p>';
+                });
+            }
+            html += '</div></details>';
+            html += '</div>';
+            return html;
+        }
+
+        function escHtml(s) { return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+        checkHealth();
+        setInterval(checkHealth, 10000);
+    </script>
+</body>
+</html>
