@@ -49,15 +49,16 @@ await using var run = await InProcessExecution.RunStreamingAsync(workflow, resea
 | `SocialGenerationExecutor` | `BlogResult` → `SocialResult` | `social-writer` | Owns agent + session. LinkedIn + 3-post thread from blog text. OTel spans emit under `creator-agent`. |
 | `OutputExecutor` | `SocialResult` → `object` | — | Reads all state, assembles `content_package` |
 
-State passing between executors uses `IWorkflowContext`:
+State passing between executors uses `IWorkflowContext` for cross-cutting values; the `BlogResult` itself flows through the typed edge from `BlogGenerationExecutor` to `SocialGenerationExecutor`:
 
 ```csharp
-// BlogGenerationExecutor writes
+// BlogGenerationExecutor writes shared state
 await context.QueueStateUpdateAsync("topic", parsed.Topic, cancellationToken);
-await context.QueueStateUpdateAsync("blogResult", result, cancellationToken);
+await context.QueueStateUpdateAsync("sourceCount", parsed.Sources.Count, cancellationToken);
 
-// SocialGenerationExecutor reads
-var topic = await context.ReadStateAsync<string>("topic", cancellationToken);
+// SocialGenerationExecutor reads shared state
+var topic = await context.ReadStateAsync<string>("topic", cancellationToken) ?? "unknown";
+var sourceCount = await context.ReadStateAsync<int>("sourceCount", cancellationToken);
 ```
 
 **Retry/Fallback:** 429 → exponential backoff (60s × attempt, max 3). LLM failure → template-based fallback that groups sources by type.

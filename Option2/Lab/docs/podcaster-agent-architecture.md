@@ -59,11 +59,11 @@ After static dictionary replacement (60+ terms), `generate_dynamic_pronunciation
 
 ## TTS (Dual Backend)
 
-[tts_client.py](../src/agent-podcaster/tts_client.py) supports two modes controlled by `TTS_MODE`:
+[tts_client.py](../src/agent-podcaster/tts_client.py) supports two modes controlled by `CONTENT_FACTORY_MODE` (default `lab`):
 
 | Mode | Backend | Voices | Use case |
 |------|---------|--------|----------|
-| `full` | GPU XTTS-v2 server | Custom WAV samples | Production — natural cloned voices |
+| `full` | GPU XTTS-v2 server at `TTS_SERVER_URL` | Custom WAV samples | Production — natural cloned voices |
 | `lab` | Azure OpenAI TTS | nova (host), onyx (guest) | Lab/demo — no GPU required |
 
 Budget timeout (`TTS_TIMEOUT_BUDGET_SECONDS=300`) caps total synthesis time. XTTS retries on 503 with exponential backoff (5s → 10s → 20s). Each turn synthesized sequentially, returns WAV bytes.

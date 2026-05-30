@@ -38,13 +38,14 @@ dotnet run --no-launch-profile --urls "http://localhost:8002"
 
 Runs on http://localhost:8002
 
-## Start Agent 3 (Podcaster) — Optional
+## Start Agent 3 (Podcaster)
 
 The podcaster agent converts research into a two-voice conversational podcast using TTS.
 
-In **lab mode** (default), it uses the **Azure OpenAI TTS** deployment (`tts-1`) — no GPU or local TTS server needed. In **full mode**, it uses a self-hosted GPU XTTS-v2 server with Azure OpenAI as fallback.
+TTS backend is selected with `CONTENT_FACTORY_MODE` in `Lab/.env`:
 
-### Start the Podcaster Agent
+- **`lab` (default)** — uses the **Azure OpenAI TTS** deployment (`tts-1`). No GPU or local TTS server needed.
+- **`full`** — uses a self-hosted GPU XTTS-v2 server (see step below) with Azure OpenAI as fallback.
 
 In a third terminal:
 
@@ -59,19 +60,11 @@ uvicorn main:app --host 0.0.0.0 --port 8003
 
 Runs on http://localhost:8003
 
-### Enable the Podcaster
-
-Set `CONTENT_FACTORY_MODE=full` in `Lab/.env` to include the podcaster in the pipeline:
-
-```
-CONTENT_FACTORY_MODE=full
-```
-
-### (Optional) Self-hosted GPU TTS Server
+## (Optional) Self-hosted GPU TTS Server
 
 Only needed if you want to use XTTS-v2 instead of Azure OpenAI TTS. Requires a CUDA-capable GPU.
 
-In a fifth terminal:
+In a fourth terminal:
 
 ```bash
 cd Lab/src/tts-server
@@ -82,9 +75,10 @@ pip install -e ".[dev]"
 uvicorn main:app --host 0.0.0.0 --port 8004 --workers 1
 ```
 
-Add these to `Lab/.env`:
+Set these in `Lab/.env`:
 
 ```
+CONTENT_FACTORY_MODE=full
 TTS_SERVER_URL=http://localhost:8004
 TTS_HOST_VOICE=host-female
 TTS_GUEST_VOICE=guest-male
@@ -93,7 +87,7 @@ TTS_TIMEOUT_BUDGET_SECONDS=300
 
 ## Start Dev UI
 
-In a fourth terminal:
+In a fifth terminal (or the fourth, if you skipped the GPU TTS server):
 
 ```bash
 cd Lab/src/dev-ui
