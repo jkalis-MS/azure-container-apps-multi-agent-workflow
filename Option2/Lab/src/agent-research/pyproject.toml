@@ -19,7 +19,7 @@ dependencies = [
     "opentelemetry-instrumentation-httpx==0.63b1",
     "opentelemetry-exporter-otlp-proto-grpc==1.42.1",
     "opentelemetry-instrumentation-openai-v2==2.4b0",
-    "azure-containerapps-sandbox @ https://github.com/microsoft/azure-container-apps/releases/download/python-sdk-v0.1.0b1-early-access/azure_containerapps_sandbox-0.1.0b1-py3-none-any.whl",
+    "azure-containerapps-sandbox==0.1.0b1",
     "azure-identity>=1.15",
 ]
 
