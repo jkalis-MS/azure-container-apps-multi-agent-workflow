@@ -8,5 +8,5 @@ langgraph>=1.2.0
 langchain-openai>=1.2.1
 opentelemetry-instrumentation-openai-v2>=2.3b0
 azure-monitor-opentelemetry>=1.8.8
-# Azure Container Apps Sandbox SDK (early-access beta)
-https://github.com/microsoft/azure-container-apps/releases/download/python-sdk-v0.1.0b1-early-access/azure_containerapps_sandbox-0.1.0b1-py3-none-any.whl
+# Azure Container Apps Sandbox SDK
+azure-containerapps-sandbox==0.1.0b1

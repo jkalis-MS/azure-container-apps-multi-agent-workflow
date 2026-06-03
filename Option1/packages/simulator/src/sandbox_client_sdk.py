@@ -12,7 +12,7 @@ To revert, change back to:
     from .sandbox_client import SandboxClient, ExecResult
 
 Install the SDK:
-    pip install https://github.com/microsoft/azure-container-apps/releases/download/python-sdk-v0.1.0b1-early-access/azure_containerapps_sandbox-0.1.0b1-py3-none-any.whl
+    pip install azure-containerapps-sandbox
 """
 
 from __future__ import annotations
