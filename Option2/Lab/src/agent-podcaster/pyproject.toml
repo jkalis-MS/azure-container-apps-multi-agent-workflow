@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agent-podcaster"
+version = "0.1.0"
+description = "Podcaster Agent - Conversational multi-voice audio podcasts from research"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi==0.136.1",
+    "uvicorn[standard]==0.47.0",
+    "httpx==0.28.1",
+    "pydantic==2.13.4",
+    "beautifulsoup4==4.14.3",
+    "python-dotenv==1.2.2",
+    "audioop-lts==0.2.2; python_version>='3.13'",
+    "pydub==0.25.1",
+    "json-repair==0.59.10",
+    "github-copilot-sdk==0.3.0",
+    "azure-storage-blob==12.29.0",
+    "opentelemetry-api==1.42.1",
+    "opentelemetry-sdk==1.42.1",
+    "opentelemetry-instrumentation-fastapi==0.63b1",
+    "opentelemetry-instrumentation-httpx==0.63b1",
+    "opentelemetry-exporter-otlp-proto-grpc==1.42.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "pytest-httpx>=0.34",
+]
+
+[tool.setuptools]
+py-modules = ["main", "agent", "a2a", "a2a_auth", "a2a_models", "script_generator", "tts_client", "audio_utils"]
+
+[tool.setuptools.packages.find]
+include = ["tools*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

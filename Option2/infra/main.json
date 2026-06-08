@@ -1,0 +1,1176 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.41.2.15936",
+      "templateHash": "12310795200281795648"
+    }
+  },
+  "parameters": {
+    "environmentName": {
+      "type": "string",
+      "metadata": {
+        "description": "Azure environment name (set automatically by azd)"
+      }
+    },
+    "baseName": {
+      "type": "string",
+      "defaultValue": "[parameters('environmentName')]",
+      "metadata": {
+        "description": "Base name for all resources"
+      }
+    },
+    "location": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]",
+      "metadata": {
+        "description": "Location for all resources"
+      }
+    },
+    "azureOpenAiEndpoint": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Azure OpenAI endpoint (optional -- defaults to Foundry endpoint)"
+      }
+    },
+    "azureOpenAiApiKey": {
+      "type": "securestring",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Azure OpenAI API key (optional -- defaults to Foundry key)"
+      }
+    },
+    "azureOpenAiDeployment": {
+      "type": "string",
+      "defaultValue": "gpt-4o",
+      "metadata": {
+        "description": "Azure OpenAI deployment name"
+      }
+    },
+    "sandboxGroupName": {
+      "type": "string",
+      "defaultValue": "[format('{0}-sg-research', parameters('baseName'))]",
+      "metadata": {
+        "description": "ACA Sandbox Group name used by Agent 1 for runtime sandbox creation"
+      }
+    },
+    "sandboxGroupUamiName": {
+      "type": "string",
+      "defaultValue": "[format('{0}-sg-uami', parameters('baseName'))]",
+      "metadata": {
+        "description": "User-assigned identity name for ACA Sandbox Group"
+      }
+    },
+    "agentResearchImageName": {
+      "type": "string",
+      "defaultValue": ""
+    },
+    "agentCreatorImageName": {
+      "type": "string",
+      "defaultValue": ""
+    },
+    "devUiImageName": {
+      "type": "string",
+      "defaultValue": ""
+    },
+    "agentPodcasterImageName": {
+      "type": "string",
+      "defaultValue": ""
+    },
+    "ttsServerImageName": {
+      "type": "string",
+      "defaultValue": ""
+    },
+    "ttsModelPullImageName": {
+      "type": "string",
+      "defaultValue": ""
+    },
+    "contentFactoryMode": {
+      "type": "string",
+      "defaultValue": "lab",
+      "metadata": {
+        "description": "Content factory mode: lab (Azure OpenAI TTS) or full (GPU XTTS-v2)"
+      }
+    },
+    "azureStorageConnectionString": {
+      "type": "securestring",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Azure Storage connection string for podcast audio uploads"
+      }
+    }
+  },
+  "variables": {
+    "defaultImage": "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest",
+    "a2aToken": "[guid(resourceGroup().id, parameters('baseName'), 'a2a-token')]",
+    "roleContributor": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'b24988ac-6180-42a0-ab88-20f7382dd24c')]",
+    "roleAcrPull": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '7f951dda-4ed3-4680-a7ca-43fe172d538d')]",
+    "roleSandboxGroupDataOwner": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'c24cf47c-5077-412d-a19c-45202126392c')]"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces",
+      "apiVersion": "2023-09-01",
+      "name": "[format('{0}-logs', parameters('baseName'))]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "sku": {
+          "name": "PerGB2018"
+        },
+        "retentionInDays": 30
+      }
+    },
+    {
+      "type": "Microsoft.Insights/components",
+      "apiVersion": "2020-02-02",
+      "name": "[format('{0}-appinsights', parameters('baseName'))]",
+      "location": "[parameters('location')]",
+      "kind": "web",
+      "properties": {
+        "Application_Type": "web",
+        "WorkspaceResourceId": "[resourceId('Microsoft.OperationalInsights/workspaces', format('{0}-logs', parameters('baseName')))]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.OperationalInsights/workspaces', format('{0}-logs', parameters('baseName')))]"
+      ]
+    },
+    {
+      "type": "Microsoft.CognitiveServices/accounts",
+      "apiVersion": "2025-04-01-preview",
+      "name": "[format('{0}-foundry', parameters('baseName'))]",
+      "location": "[parameters('location')]",
+      "kind": "AIServices",
+      "identity": {
+        "type": "SystemAssigned"
+      },
+      "sku": {
+        "name": "S0"
+      },
+      "properties": {
+        "publicNetworkAccess": "Enabled",
+        "customSubDomainName": "[format('{0}-foundry', parameters('baseName'))]",
+        "allowProjectManagement": true
+      }
+    },
+    {
+      "type": "Microsoft.CognitiveServices/accounts/projects",
+      "apiVersion": "2025-04-01-preview",
+      "name": "[format('{0}/{1}', format('{0}-foundry', parameters('baseName')), format('{0}-project', parameters('baseName')))]",
+      "location": "[parameters('location')]",
+      "identity": {
+        "type": "SystemAssigned"
+      },
+      "properties": {},
+      "dependsOn": [
+        "[resourceId('Microsoft.CognitiveServices/accounts', format('{0}-foundry', parameters('baseName')))]"
+      ]
+    },
+    {
+      "type": "Microsoft.CognitiveServices/accounts/deployments",
+      "apiVersion": "2024-10-01",
+      "name": "[format('{0}/{1}', format('{0}-foundry', parameters('baseName')), parameters('azureOpenAiDeployment'))]",
+      "sku": {
+        "name": "GlobalStandard",
+        "capacity": 80
+      },
+      "properties": {
+        "model": {
+          "format": "OpenAI",
+          "name": "gpt-4o",
+          "version": "2024-11-20"
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.CognitiveServices/accounts', format('{0}-foundry', parameters('baseName')))]"
+      ]
+    },
+    {
+      "type": "Microsoft.CognitiveServices/accounts/deployments",
+      "apiVersion": "2024-10-01",
+      "name": "[format('{0}/{1}', format('{0}-foundry', parameters('baseName')), 'tts-1')]",
+      "sku": {
+        "name": "Standard",
+        "capacity": 1
+      },
+      "properties": {
+        "model": {
+          "format": "OpenAI",
+          "name": "tts",
+          "version": "001"
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.CognitiveServices/accounts', format('{0}-foundry', parameters('baseName')))]",
+        "[resourceId('Microsoft.CognitiveServices/accounts/deployments', format('{0}-foundry', parameters('baseName')), parameters('azureOpenAiDeployment'))]"
+      ]
+    },
+    {
+      "condition": "[equals(parameters('contentFactoryMode'), 'full')]",
+      "type": "Microsoft.Network/virtualNetworks",
+      "apiVersion": "2023-06-01",
+      "name": "[format('{0}-vnet', parameters('baseName'))]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "addressSpace": {
+          "addressPrefixes": [
+            "10.0.0.0/16"
+          ]
+        },
+        "subnets": [
+          {
+            "name": "infrastructure",
+            "properties": {
+              "addressPrefix": "10.0.0.0/23",
+              "delegations": [
+                {
+                  "name": "aca-delegation",
+                  "properties": {
+                    "serviceName": "Microsoft.App/environments"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "name": "private-endpoints",
+            "properties": {
+              "addressPrefix": "10.0.2.0/24"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.App/managedEnvironments",
+      "apiVersion": "2024-10-02-preview",
+      "name": "[format('{0}-env', parameters('baseName'))]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "vnetConfiguration": "[if(equals(parameters('contentFactoryMode'), 'full'), createObject('infrastructureSubnetId', reference(resourceId('Microsoft.Network/virtualNetworks', format('{0}-vnet', parameters('baseName'))), '2023-06-01').subnets[0].id, 'internal', false()), null())]",
+        "workloadProfiles": "[if(equals(parameters('contentFactoryMode'), 'full'), createArray(createObject('name', 'Consumption', 'workloadProfileType', 'Consumption'), createObject('name', 'gpu-t4', 'workloadProfileType', 'Consumption-GPU-NC8as-T4')), createArray(createObject('name', 'Consumption', 'workloadProfileType', 'Consumption')))]",
+        "appLogsConfiguration": {
+          "destination": "log-analytics",
+          "logAnalyticsConfiguration": {
+            "customerId": "[reference(resourceId('Microsoft.OperationalInsights/workspaces', format('{0}-logs', parameters('baseName'))), '2023-09-01').customerId]",
+            "sharedKey": "[listKeys(resourceId('Microsoft.OperationalInsights/workspaces', format('{0}-logs', parameters('baseName'))), '2023-09-01').primarySharedKey]"
+          }
+        },
+        "appInsightsConfiguration": {
+          "connectionString": "[reference(resourceId('Microsoft.Insights/components', format('{0}-appinsights', parameters('baseName'))), '2020-02-02').ConnectionString]"
+        },
+        "openTelemetryConfiguration": {
+          "destinationsConfiguration": {},
+          "tracesConfiguration": {
+            "destinations": [
+              "appInsights"
+            ]
+          },
+          "logsConfiguration": {
+            "destinations": [
+              "appInsights"
+            ]
+          },
+          "metricsConfiguration": {
+            "destinations": [
+              "appInsights"
+            ]
+          }
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Insights/components', format('{0}-appinsights', parameters('baseName')))]",
+        "[resourceId('Microsoft.OperationalInsights/workspaces', format('{0}-logs', parameters('baseName')))]",
+        "[resourceId('Microsoft.Network/virtualNetworks', format('{0}-vnet', parameters('baseName')))]"
+      ]
+    },
+    {
+      "type": "Microsoft.App/managedEnvironments",
+      "apiVersion": "2026-03-02-preview",
+      "name": "[format('{0}-env-express', parameters('baseName'))]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "environmentMode": "Express",
+        "appLogsConfiguration": {
+          "destination": "log-analytics",
+          "logAnalyticsConfiguration": {
+            "customerId": "[reference(resourceId('Microsoft.OperationalInsights/workspaces', format('{0}-logs', parameters('baseName'))), '2023-09-01').customerId]",
+            "sharedKey": "[listKeys(resourceId('Microsoft.OperationalInsights/workspaces', format('{0}-logs', parameters('baseName'))), '2023-09-01').primarySharedKey]"
+          }
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.OperationalInsights/workspaces', format('{0}-logs', parameters('baseName')))]"
+      ]
+    },
+    {
+      "type": "Microsoft.ContainerRegistry/registries",
+      "apiVersion": "2023-11-01-preview",
+      "name": "[replace(format('{0}acr', parameters('baseName')), '-', '')]",
+      "location": "[parameters('location')]",
+      "sku": {
+        "name": "Basic"
+      },
+      "properties": {
+        "adminUserEnabled": true
+      }
+    },
+    {
+      "type": "Microsoft.ManagedIdentity/userAssignedIdentities",
+      "apiVersion": "2023-01-31",
+      "name": "[parameters('sandboxGroupUamiName')]",
+      "location": "[parameters('location')]"
+    },
+    {
+      "type": "Microsoft.App/sandboxGroups",
+      "apiVersion": "2026-02-01-preview",
+      "name": "[parameters('sandboxGroupName')]",
+      "location": "[parameters('location')]",
+      "identity": {
+        "type": "UserAssigned",
+        "userAssignedIdentities": {
+          "[format('{0}', resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('sandboxGroupUamiName')))]": {}
+        }
+      },
+      "properties": {
+        "imageRegistryCredentials": [
+          {
+            "server": "[reference(resourceId('Microsoft.ContainerRegistry/registries', replace(format('{0}acr', parameters('baseName')), '-', '')), '2023-11-01-preview').loginServer]",
+            "identity": "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('sandboxGroupUamiName'))]"
+          }
+        ]
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ContainerRegistry/registries', replace(format('{0}acr', parameters('baseName')), '-', ''))]",
+        "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('sandboxGroupUamiName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2022-04-01",
+      "scope": "[resourceId('Microsoft.ContainerRegistry/registries', replace(format('{0}acr', parameters('baseName')), '-', ''))]",
+      "name": "[guid(resourceId('Microsoft.ContainerRegistry/registries', replace(format('{0}acr', parameters('baseName')), '-', '')), resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('sandboxGroupUamiName')), 'sandbox-group-acr-pull')]",
+      "properties": {
+        "principalId": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('sandboxGroupUamiName')), '2023-01-31').principalId]",
+        "principalType": "ServicePrincipal",
+        "roleDefinitionId": "[variables('roleAcrPull')]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ContainerRegistry/registries', replace(format('{0}acr', parameters('baseName')), '-', ''))]",
+        "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('sandboxGroupUamiName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2022-04-01",
+      "scope": "[resourceId('Microsoft.App/sandboxGroups', parameters('sandboxGroupName'))]",
+      "name": "[guid(resourceId('Microsoft.App/sandboxGroups', parameters('sandboxGroupName')), resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('sandboxGroupUamiName')), 'sandbox-group-mi-contributor')]",
+      "properties": {
+        "principalId": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('sandboxGroupUamiName')), '2023-01-31').principalId]",
+        "principalType": "ServicePrincipal",
+        "roleDefinitionId": "[variables('roleContributor')]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.App/sandboxGroups', parameters('sandboxGroupName'))]",
+        "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('sandboxGroupUamiName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts",
+      "apiVersion": "2023-01-01",
+      "name": "[replace(format('{0}store', parameters('baseName')), '-', '')]",
+      "location": "[parameters('location')]",
+      "sku": {
+        "name": "Standard_LRS"
+      },
+      "kind": "StorageV2",
+      "properties": {
+        "allowBlobPublicAccess": false,
+        "minimumTlsVersion": "TLS1_2"
+      }
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts/blobServices",
+      "apiVersion": "2023-01-01",
+      "name": "[format('{0}/{1}', replace(format('{0}store', parameters('baseName')), '-', ''), 'default')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Storage/storageAccounts', replace(format('{0}store', parameters('baseName')), '-', ''))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts/blobServices/containers",
+      "apiVersion": "2023-01-01",
+      "name": "[format('{0}/{1}/{2}', replace(format('{0}store', parameters('baseName')), '-', ''), 'default', 'podcasts')]",
+      "properties": {
+        "publicAccess": "None"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Storage/storageAccounts/blobServices', replace(format('{0}store', parameters('baseName')), '-', ''), 'default')]"
+      ]
+    },
+    {
+      "condition": "[equals(parameters('contentFactoryMode'), 'full')]",
+      "type": "Microsoft.Storage/storageAccounts",
+      "apiVersion": "2023-01-01",
+      "name": "[replace(format('{0}nfs', parameters('baseName')), '-', '')]",
+      "location": "[parameters('location')]",
+      "sku": {
+        "name": "Premium_LRS"
+      },
+      "kind": "FileStorage",
+      "properties": {
+        "allowBlobPublicAccess": false,
+        "publicNetworkAccess": "Disabled",
+        "supportsHttpsTrafficOnly": false,
+        "allowSharedKeyAccess": true,
+        "networkAcls": {
+          "bypass": "AzureServices",
+          "defaultAction": "Deny"
+        }
+      }
+    },
+    {
+      "condition": "[equals(parameters('contentFactoryMode'), 'full')]",
+      "type": "Microsoft.Storage/storageAccounts/fileServices",
+      "apiVersion": "2023-01-01",
+      "name": "[format('{0}/{1}', replace(format('{0}nfs', parameters('baseName')), '-', ''), 'default')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Storage/storageAccounts', replace(format('{0}nfs', parameters('baseName')), '-', ''))]"
+      ]
+    },
+    {
+      "condition": "[equals(parameters('contentFactoryMode'), 'full')]",
+      "type": "Microsoft.Storage/storageAccounts/fileServices/shares",
+      "apiVersion": "2023-01-01",
+      "name": "[format('{0}/{1}/{2}', replace(format('{0}nfs', parameters('baseName')), '-', ''), 'default', 'xtts-models')]",
+      "properties": {
+        "enabledProtocols": "NFS",
+        "shareQuota": 100,
+        "rootSquash": "NoRootSquash"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Storage/storageAccounts/fileServices', replace(format('{0}nfs', parameters('baseName')), '-', ''), 'default')]"
+      ]
+    },
+    {
+      "condition": "[equals(parameters('contentFactoryMode'), 'full')]",
+      "type": "Microsoft.Network/privateEndpoints",
+      "apiVersion": "2023-06-01",
+      "name": "[format('{0}-nfs-pe', parameters('baseName'))]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "subnet": {
+          "id": "[reference(resourceId('Microsoft.Network/virtualNetworks', format('{0}-vnet', parameters('baseName'))), '2023-06-01').subnets[1].id]"
+        },
+        "privateLinkServiceConnections": [
+          {
+            "name": "nfs-connection",
+            "properties": {
+              "privateLinkServiceId": "[resourceId('Microsoft.Storage/storageAccounts', replace(format('{0}nfs', parameters('baseName')), '-', ''))]",
+              "groupIds": [
+                "file"
+              ]
+            }
+          }
+        ]
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Storage/storageAccounts', replace(format('{0}nfs', parameters('baseName')), '-', ''))]",
+        "[resourceId('Microsoft.Network/virtualNetworks', format('{0}-vnet', parameters('baseName')))]"
+      ]
+    },
+    {
+      "condition": "[equals(parameters('contentFactoryMode'), 'full')]",
+      "type": "Microsoft.Network/privateDnsZones",
+      "apiVersion": "2020-06-01",
+      "name": "privatelink.file.core.windows.net",
+      "location": "global"
+    },
+    {
+      "condition": "[equals(parameters('contentFactoryMode'), 'full')]",
+      "type": "Microsoft.Network/privateDnsZones/virtualNetworkLinks",
+      "apiVersion": "2020-06-01",
+      "name": "[format('{0}/{1}', 'privatelink.file.core.windows.net', 'vnet-link')]",
+      "location": "global",
+      "properties": {
+        "virtualNetwork": {
+          "id": "[resourceId('Microsoft.Network/virtualNetworks', format('{0}-vnet', parameters('baseName')))]"
+        },
+        "registrationEnabled": false
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/privateDnsZones', 'privatelink.file.core.windows.net')]",
+        "[resourceId('Microsoft.Network/virtualNetworks', format('{0}-vnet', parameters('baseName')))]"
+      ]
+    },
+    {
+      "condition": "[equals(parameters('contentFactoryMode'), 'full')]",
+      "type": "Microsoft.Network/privateEndpoints/privateDnsZoneGroups",
+      "apiVersion": "2023-06-01",
+      "name": "[format('{0}/{1}', format('{0}-nfs-pe', parameters('baseName')), 'default')]",
+      "properties": {
+        "privateDnsZoneConfigs": [
+          {
+            "name": "config",
+            "properties": {
+              "privateDnsZoneId": "[resourceId('Microsoft.Network/privateDnsZones', 'privatelink.file.core.windows.net')]"
+            }
+          }
+        ]
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/privateDnsZones', 'privatelink.file.core.windows.net')]",
+        "[resourceId('Microsoft.Network/privateEndpoints', format('{0}-nfs-pe', parameters('baseName')))]"
+      ]
+    },
+    {
+      "condition": "[equals(parameters('contentFactoryMode'), 'full')]",
+      "type": "Microsoft.App/managedEnvironments/storages",
+      "apiVersion": "2024-10-02-preview",
+      "name": "[format('{0}/{1}', format('{0}-env', parameters('baseName')), 'xtts-model-storage')]",
+      "properties": {
+        "nfsAzureFile": {
+          "server": "[format('{0}.file.core.windows.net', replace(format('{0}nfs', parameters('baseName')), '-', ''))]",
+          "shareName": "[format('/{0}/xtts-models', replace(format('{0}nfs', parameters('baseName')), '-', ''))]",
+          "accessMode": "ReadWrite"
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.App/managedEnvironments', format('{0}-env', parameters('baseName')))]",
+        "[resourceId('Microsoft.Network/privateEndpoints/privateDnsZoneGroups', format('{0}-nfs-pe', parameters('baseName')), 'default')]",
+        "[resourceId('Microsoft.Network/privateDnsZones/virtualNetworkLinks', 'privatelink.file.core.windows.net', 'vnet-link')]",
+        "[resourceId('Microsoft.Storage/storageAccounts', replace(format('{0}nfs', parameters('baseName')), '-', ''))]"
+      ]
+    },
+    {
+      "type": "Microsoft.App/containerApps",
+      "apiVersion": "2024-03-01",
+      "name": "[format('{0}-agent-research', parameters('baseName'))]",
+      "location": "[parameters('location')]",
+      "tags": {
+        "azd-service-name": "agent-research"
+      },
+      "identity": {
+        "type": "SystemAssigned"
+      },
+      "properties": {
+        "managedEnvironmentId": "[resourceId('Microsoft.App/managedEnvironments', format('{0}-env', parameters('baseName')))]",
+        "configuration": {
+          "ingress": {
+            "external": true,
+            "targetPort": 8001,
+            "transport": "http"
+          },
+          "registries": [
+            {
+              "server": "[reference(resourceId('Microsoft.ContainerRegistry/registries', replace(format('{0}acr', parameters('baseName')), '-', '')), '2023-11-01-preview').loginServer]",
+              "username": "[listCredentials(resourceId('Microsoft.ContainerRegistry/registries', replace(format('{0}acr', parameters('baseName')), '-', '')), '2023-11-01-preview').username]",
+              "passwordSecretRef": "acr-password"
+            }
+          ],
+          "secrets": [
+            {
+              "name": "acr-password",
+              "value": "[listCredentials(resourceId('Microsoft.ContainerRegistry/registries', replace(format('{0}acr', parameters('baseName')), '-', '')), '2023-11-01-preview').passwords[0].value]"
+            },
+            {
+              "name": "azure-openai-key",
+              "value": "[if(not(equals(parameters('azureOpenAiApiKey'), '')), parameters('azureOpenAiApiKey'), listKeys(resourceId('Microsoft.CognitiveServices/accounts', format('{0}-foundry', parameters('baseName'))), '2025-04-01-preview').key1)]"
+            },
+            {
+              "name": "a2a-auth-token",
+              "value": "[variables('a2aToken')]"
+            }
+          ]
+        },
+        "template": {
+          "containers": [
+            {
+              "name": "agent-research",
+              "image": "[if(not(equals(parameters('agentResearchImageName'), '')), parameters('agentResearchImageName'), variables('defaultImage'))]",
+              "resources": {
+                "cpu": "[json('0.5')]",
+                "memory": "1Gi"
+              },
+              "env": [
+                {
+                  "name": "AZURE_OPENAI_ENDPOINT",
+                  "value": "[if(not(equals(parameters('azureOpenAiEndpoint'), '')), parameters('azureOpenAiEndpoint'), reference(resourceId('Microsoft.CognitiveServices/accounts', format('{0}-foundry', parameters('baseName'))), '2025-04-01-preview').endpoint)]"
+                },
+                {
+                  "name": "AZURE_OPENAI_API_KEY",
+                  "secretRef": "azure-openai-key"
+                },
+                {
+                  "name": "AZURE_OPENAI_DEPLOYMENT",
+                  "value": "[parameters('azureOpenAiDeployment')]"
+                },
+                {
+                  "name": "AZURE_OPENAI_API_VERSION",
+                  "value": "2024-12-01-preview"
+                },
+                {
+                  "name": "CONTENT_FACTORY_MODE",
+                  "value": "lab"
+                },
+                {
+                  "name": "OTEL_SERVICE_NAME",
+                  "value": "research-agent"
+                },
+                {
+                  "name": "OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT",
+                  "value": "true"
+                },
+                {
+                  "name": "A2A_AUTH_ENABLED",
+                  "value": "true"
+                },
+                {
+                  "name": "A2A_AUTH_TOKEN",
+                  "secretRef": "a2a-auth-token"
+                },
+                {
+                  "name": "AZURE_SUBSCRIPTION_ID",
+                  "value": "[subscription().subscriptionId]"
+                },
+                {
+                  "name": "ACA_SANDBOX_RESOURCE_GROUP",
+                  "value": "[resourceGroup().name]"
+                },
+                {
+                  "name": "ACA_SANDBOX_GROUP_NAME",
+                  "value": "[parameters('sandboxGroupName')]"
+                },
+                {
+                  "name": "ACA_SANDBOXGROUP_REGION",
+                  "value": "[parameters('location')]"
+                }
+              ]
+            }
+          ],
+          "scale": {
+            "minReplicas": 1,
+            "maxReplicas": 3
+          }
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.App/managedEnvironments', format('{0}-env', parameters('baseName')))]",
+        "[resourceId('Microsoft.ContainerRegistry/registries', replace(format('{0}acr', parameters('baseName')), '-', ''))]",
+        "[resourceId('Microsoft.CognitiveServices/accounts', format('{0}-foundry', parameters('baseName')))]",
+        "[resourceId('Microsoft.App/sandboxGroups', parameters('sandboxGroupName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2022-04-01",
+      "scope": "[resourceId('Microsoft.App/sandboxGroups', parameters('sandboxGroupName'))]",
+      "name": "[guid(resourceId('Microsoft.App/sandboxGroups', parameters('sandboxGroupName')), resourceId('Microsoft.App/containerApps', format('{0}-agent-research', parameters('baseName'))), 'research-sandboxgroup-data-owner')]",
+      "properties": {
+        "principalId": "[reference(resourceId('Microsoft.App/containerApps', format('{0}-agent-research', parameters('baseName'))), '2024-03-01', 'full').identity.principalId]",
+        "principalType": "ServicePrincipal",
+        "roleDefinitionId": "[variables('roleSandboxGroupDataOwner')]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.App/containerApps', format('{0}-agent-research', parameters('baseName')))]",
+        "[resourceId('Microsoft.App/sandboxGroups', parameters('sandboxGroupName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.App/containerApps",
+      "apiVersion": "2024-03-01",
+      "name": "[format('{0}-agent-creator', parameters('baseName'))]",
+      "location": "[parameters('location')]",
+      "tags": {
+        "azd-service-name": "agent-creator"
+      },
+      "properties": {
+        "managedEnvironmentId": "[resourceId('Microsoft.App/managedEnvironments', format('{0}-env', parameters('baseName')))]",
+        "configuration": {
+          "ingress": {
+            "external": true,
+            "targetPort": 8002,
+            "transport": "http"
+          },
+          "registries": [
+            {
+              "server": "[reference(resourceId('Microsoft.ContainerRegistry/registries', replace(format('{0}acr', parameters('baseName')), '-', '')), '2023-11-01-preview').loginServer]",
+              "username": "[listCredentials(resourceId('Microsoft.ContainerRegistry/registries', replace(format('{0}acr', parameters('baseName')), '-', '')), '2023-11-01-preview').username]",
+              "passwordSecretRef": "acr-password"
+            }
+          ],
+          "secrets": [
+            {
+              "name": "acr-password",
+              "value": "[listCredentials(resourceId('Microsoft.ContainerRegistry/registries', replace(format('{0}acr', parameters('baseName')), '-', '')), '2023-11-01-preview').passwords[0].value]"
+            },
+            {
+              "name": "azure-openai-key",
+              "value": "[if(not(equals(parameters('azureOpenAiApiKey'), '')), parameters('azureOpenAiApiKey'), listKeys(resourceId('Microsoft.CognitiveServices/accounts', format('{0}-foundry', parameters('baseName'))), '2025-04-01-preview').key1)]"
+            },
+            {
+              "name": "a2a-auth-token",
+              "value": "[variables('a2aToken')]"
+            }
+          ]
+        },
+        "template": {
+          "containers": [
+            {
+              "name": "agent-creator",
+              "image": "[if(not(equals(parameters('agentCreatorImageName'), '')), parameters('agentCreatorImageName'), variables('defaultImage'))]",
+              "resources": {
+                "cpu": "[json('0.5')]",
+                "memory": "1Gi"
+              },
+              "env": [
+                {
+                  "name": "AZURE_OPENAI_ENDPOINT",
+                  "value": "[if(not(equals(parameters('azureOpenAiEndpoint'), '')), parameters('azureOpenAiEndpoint'), reference(resourceId('Microsoft.CognitiveServices/accounts', format('{0}-foundry', parameters('baseName'))), '2025-04-01-preview').endpoint)]"
+                },
+                {
+                  "name": "AZURE_OPENAI_API_KEY",
+                  "secretRef": "azure-openai-key"
+                },
+                {
+                  "name": "AZURE_OPENAI_DEPLOYMENT",
+                  "value": "[parameters('azureOpenAiDeployment')]"
+                },
+                {
+                  "name": "CONTENT_FACTORY_MODE",
+                  "value": "lab"
+                },
+                {
+                  "name": "OTEL_SERVICE_NAME",
+                  "value": "creator-agent"
+                },
+                {
+                  "name": "OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT",
+                  "value": "true"
+                },
+                {
+                  "name": "A2A_AUTH_ENABLED",
+                  "value": "true"
+                },
+                {
+                  "name": "A2A_AUTH_TOKEN",
+                  "secretRef": "a2a-auth-token"
+                }
+              ]
+            }
+          ],
+          "scale": {
+            "minReplicas": 1,
+            "maxReplicas": 1
+          }
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.App/managedEnvironments', format('{0}-env', parameters('baseName')))]",
+        "[resourceId('Microsoft.ContainerRegistry/registries', replace(format('{0}acr', parameters('baseName')), '-', ''))]",
+        "[resourceId('Microsoft.CognitiveServices/accounts', format('{0}-foundry', parameters('baseName')))]"
+      ]
+    },
+    {
+      "type": "Microsoft.App/containerApps",
+      "apiVersion": "2024-03-01",
+      "name": "[format('{0}-agent-podcaster', parameters('baseName'))]",
+      "location": "[parameters('location')]",
+      "tags": {
+        "azd-service-name": "agent-podcaster"
+      },
+      "properties": {
+        "managedEnvironmentId": "[resourceId('Microsoft.App/managedEnvironments', format('{0}-env', parameters('baseName')))]",
+        "configuration": {
+          "ingress": {
+            "external": true,
+            "targetPort": 8003,
+            "transport": "http"
+          },
+          "registries": [
+            {
+              "server": "[reference(resourceId('Microsoft.ContainerRegistry/registries', replace(format('{0}acr', parameters('baseName')), '-', '')), '2023-11-01-preview').loginServer]",
+              "username": "[listCredentials(resourceId('Microsoft.ContainerRegistry/registries', replace(format('{0}acr', parameters('baseName')), '-', '')), '2023-11-01-preview').username]",
+              "passwordSecretRef": "acr-password"
+            }
+          ],
+          "secrets": [
+            {
+              "name": "acr-password",
+              "value": "[listCredentials(resourceId('Microsoft.ContainerRegistry/registries', replace(format('{0}acr', parameters('baseName')), '-', '')), '2023-11-01-preview').passwords[0].value]"
+            },
+            {
+              "name": "azure-openai-key",
+              "value": "[if(not(equals(parameters('azureOpenAiApiKey'), '')), parameters('azureOpenAiApiKey'), listKeys(resourceId('Microsoft.CognitiveServices/accounts', format('{0}-foundry', parameters('baseName'))), '2025-04-01-preview').key1)]"
+            },
+            {
+              "name": "azure-storage-connection",
+              "value": "[if(not(equals(parameters('azureStorageConnectionString'), '')), parameters('azureStorageConnectionString'), format('DefaultEndpointsProtocol=https;AccountName={0};AccountKey={1};EndpointSuffix=core.windows.net', replace(format('{0}store', parameters('baseName')), '-', ''), listKeys(resourceId('Microsoft.Storage/storageAccounts', replace(format('{0}store', parameters('baseName')), '-', '')), '2023-01-01').keys[0].value))]"
+            },
+            {
+              "name": "a2a-auth-token",
+              "value": "[variables('a2aToken')]"
+            }
+          ]
+        },
+        "template": {
+          "containers": [
+            {
+              "name": "agent-podcaster",
+              "image": "[if(not(equals(parameters('agentPodcasterImageName'), '')), parameters('agentPodcasterImageName'), variables('defaultImage'))]",
+              "resources": {
+                "cpu": "[json('0.5')]",
+                "memory": "1Gi"
+              },
+              "env": [
+                {
+                  "name": "AZURE_OPENAI_ENDPOINT",
+                  "value": "[if(not(equals(parameters('azureOpenAiEndpoint'), '')), parameters('azureOpenAiEndpoint'), reference(resourceId('Microsoft.CognitiveServices/accounts', format('{0}-foundry', parameters('baseName'))), '2025-04-01-preview').endpoint)]"
+                },
+                {
+                  "name": "AZURE_OPENAI_API_KEY",
+                  "secretRef": "azure-openai-key"
+                },
+                {
+                  "name": "AZURE_OPENAI_DEPLOYMENT",
+                  "value": "[parameters('azureOpenAiDeployment')]"
+                },
+                {
+                  "name": "AZURE_OPENAI_API_VERSION",
+                  "value": "2024-12-01-preview"
+                },
+                {
+                  "name": "CONTENT_FACTORY_MODE",
+                  "value": "[parameters('contentFactoryMode')]"
+                },
+                {
+                  "name": "TTS_SERVER_URL",
+                  "value": "[if(equals(parameters('contentFactoryMode'), 'full'), format('https://{0}', reference(resourceId('Microsoft.App/containerApps', format('{0}-tts-server', parameters('baseName'))), '2024-10-02-preview').configuration.ingress.fqdn), '')]"
+                },
+                {
+                  "name": "AZURE_STORAGE_CONNECTION_STRING",
+                  "secretRef": "azure-storage-connection"
+                },
+                {
+                  "name": "AGENT_BASE_URL",
+                  "value": "[format('https://{0}-agent-podcaster.{1}', parameters('baseName'), reference(resourceId('Microsoft.App/managedEnvironments', format('{0}-env', parameters('baseName'))), '2024-10-02-preview').defaultDomain)]"
+                },
+                {
+                  "name": "OTEL_SERVICE_NAME",
+                  "value": "podcaster-agent"
+                },
+                {
+                  "name": "OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT",
+                  "value": "true"
+                },
+                {
+                  "name": "A2A_AUTH_ENABLED",
+                  "value": "true"
+                },
+                {
+                  "name": "A2A_AUTH_TOKEN",
+                  "secretRef": "a2a-auth-token"
+                }
+              ]
+            }
+          ],
+          "scale": {
+            "minReplicas": 1,
+            "maxReplicas": 1
+          }
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.App/managedEnvironments', format('{0}-env', parameters('baseName')))]",
+        "[resourceId('Microsoft.ContainerRegistry/registries', replace(format('{0}acr', parameters('baseName')), '-', ''))]",
+        "[resourceId('Microsoft.CognitiveServices/accounts', format('{0}-foundry', parameters('baseName')))]",
+        "[resourceId('Microsoft.Storage/storageAccounts', replace(format('{0}store', parameters('baseName')), '-', ''))]",
+        "[resourceId('Microsoft.App/containerApps', format('{0}-tts-server', parameters('baseName')))]"
+      ]
+    },
+    {
+      "condition": "[equals(parameters('contentFactoryMode'), 'full')]",
+      "type": "Microsoft.App/containerApps",
+      "apiVersion": "2024-10-02-preview",
+      "name": "[format('{0}-tts-server', parameters('baseName'))]",
+      "location": "[parameters('location')]",
+      "tags": {
+        "azd-service-name": "tts-server"
+      },
+      "properties": {
+        "managedEnvironmentId": "[resourceId('Microsoft.App/managedEnvironments', format('{0}-env', parameters('baseName')))]",
+        "workloadProfileName": "gpu-t4",
+        "configuration": {
+          "ingress": {
+            "external": false,
+            "targetPort": 8004,
+            "transport": "http"
+          },
+          "registries": [
+            {
+              "server": "[reference(resourceId('Microsoft.ContainerRegistry/registries', replace(format('{0}acr', parameters('baseName')), '-', '')), '2023-11-01-preview').loginServer]",
+              "username": "[listCredentials(resourceId('Microsoft.ContainerRegistry/registries', replace(format('{0}acr', parameters('baseName')), '-', '')), '2023-11-01-preview').username]",
+              "passwordSecretRef": "acr-password"
+            }
+          ],
+          "secrets": [
+            {
+              "name": "acr-password",
+              "value": "[listCredentials(resourceId('Microsoft.ContainerRegistry/registries', replace(format('{0}acr', parameters('baseName')), '-', '')), '2023-11-01-preview').passwords[0].value]"
+            }
+          ]
+        },
+        "template": {
+          "initContainers": [
+            {
+              "name": "model-prefetch",
+              "image": "[if(not(equals(parameters('ttsModelPullImageName'), '')), parameters('ttsModelPullImageName'), if(not(equals(parameters('ttsServerImageName'), '')), parameters('ttsServerImageName'), variables('defaultImage')))]",
+              "command": [
+                "sh",
+                "-c",
+                "command -v huggingface-cli >/dev/null 2>&1 && { test -f /models/xtts-v2/config.json && echo \"XTTS-v2 model cached on NFS\" || { echo \"Downloading XTTS-v2...\" && huggingface-cli download coqui/XTTS-v2 --local-dir /models/xtts-v2 && echo \"Download complete\"; }; } || echo \"Skipping model pull (placeholder image)\""
+              ],
+              "resources": {
+                "cpu": "[json('2')]",
+                "memory": "4Gi"
+              },
+              "volumeMounts": [
+                {
+                  "volumeName": "xtts-models",
+                  "mountPath": "/models"
+                }
+              ]
+            }
+          ],
+          "containers": [
+            {
+              "name": "tts-server",
+              "image": "[if(not(equals(parameters('ttsServerImageName'), '')), parameters('ttsServerImageName'), variables('defaultImage'))]",
+              "resources": {
+                "cpu": "[json('8')]",
+                "memory": "28Gi"
+              },
+              "env": [
+                {
+                  "name": "MODEL_PATH",
+                  "value": "/models/xtts-v2"
+                },
+                {
+                  "name": "COQUI_TOS_AGREED",
+                  "value": "1"
+                },
+                {
+                  "name": "OTEL_SERVICE_NAME",
+                  "value": "tts-server"
+                },
+                {
+                  "name": "OTEL_EXPORTER_OTLP_ENDPOINT",
+                  "value": "http://localhost:4317"
+                }
+              ],
+              "volumeMounts": [
+                {
+                  "volumeName": "xtts-models",
+                  "mountPath": "/models"
+                }
+              ],
+              "probes": [
+                {
+                  "type": "Startup",
+                  "httpGet": {
+                    "path": "/health",
+                    "port": 8004
+                  },
+                  "initialDelaySeconds": 60,
+                  "periodSeconds": 30,
+                  "failureThreshold": 20
+                },
+                {
+                  "type": "Readiness",
+                  "httpGet": {
+                    "path": "/health",
+                    "port": 8004
+                  },
+                  "periodSeconds": 15
+                }
+              ]
+            }
+          ],
+          "volumes": [
+            {
+              "name": "xtts-models",
+              "storageType": "NfsAzureFile",
+              "storageName": "xtts-model-storage"
+            }
+          ],
+          "scale": {
+            "minReplicas": 1,
+            "maxReplicas": 1
+          }
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.App/managedEnvironments', format('{0}-env', parameters('baseName')))]",
+        "[resourceId('Microsoft.ContainerRegistry/registries', replace(format('{0}acr', parameters('baseName')), '-', ''))]",
+        "[resourceId('Microsoft.App/managedEnvironments/storages', format('{0}-env', parameters('baseName')), 'xtts-model-storage')]"
+      ]
+    },
+    {
+      "type": "Microsoft.App/containerApps",
+      "apiVersion": "2024-03-01",
+      "name": "[format('{0}-dev-ui', parameters('baseName'))]",
+      "location": "[parameters('location')]",
+      "tags": {
+        "azd-service-name": "dev-ui"
+      },
+      "properties": {
+        "managedEnvironmentId": "[resourceId('Microsoft.App/managedEnvironments', format('{0}-env-express', parameters('baseName')))]",
+        "configuration": {
+          "ingress": {
+            "external": true,
+            "targetPort": 8080,
+            "transport": "http"
+          },
+          "registries": [
+            {
+              "server": "[reference(resourceId('Microsoft.ContainerRegistry/registries', replace(format('{0}acr', parameters('baseName')), '-', '')), '2023-11-01-preview').loginServer]",
+              "username": "[listCredentials(resourceId('Microsoft.ContainerRegistry/registries', replace(format('{0}acr', parameters('baseName')), '-', '')), '2023-11-01-preview').username]",
+              "passwordSecretRef": "acr-password"
+            }
+          ],
+          "secrets": [
+            {
+              "name": "acr-password",
+              "value": "[listCredentials(resourceId('Microsoft.ContainerRegistry/registries', replace(format('{0}acr', parameters('baseName')), '-', '')), '2023-11-01-preview').passwords[0].value]"
+            },
+            {
+              "name": "a2a-auth-token",
+              "value": "[variables('a2aToken')]"
+            }
+          ]
+        },
+        "template": {
+          "containers": [
+            {
+              "name": "dev-ui",
+              "image": "[if(not(equals(parameters('devUiImageName'), '')), parameters('devUiImageName'), variables('defaultImage'))]",
+              "resources": {
+                "cpu": "[json('0.25')]",
+                "memory": "0.5Gi"
+              },
+              "env": [
+                {
+                  "name": "AGENT1_URL",
+                  "value": "[format('https://{0}', reference(resourceId('Microsoft.App/containerApps', format('{0}-agent-research', parameters('baseName'))), '2024-03-01').configuration.ingress.fqdn)]"
+                },
+                {
+                  "name": "AGENT2_URL",
+                  "value": "[format('https://{0}', reference(resourceId('Microsoft.App/containerApps', format('{0}-agent-creator', parameters('baseName'))), '2024-03-01').configuration.ingress.fqdn)]"
+                },
+                {
+                  "name": "AGENT3_URL",
+                  "value": "[format('https://{0}', reference(resourceId('Microsoft.App/containerApps', format('{0}-agent-podcaster', parameters('baseName'))), '2024-03-01').configuration.ingress.fqdn)]"
+                },
+                {
+                  "name": "A2A_AUTH_TOKEN",
+                  "secretRef": "a2a-auth-token"
+                }
+              ]
+            }
+          ],
+          "scale": {
+            "minReplicas": 1,
+            "maxReplicas": 1
+          }
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.App/managedEnvironments', format('{0}-env-express', parameters('baseName')))]",
+        "[resourceId('Microsoft.ContainerRegistry/registries', replace(format('{0}acr', parameters('baseName')), '-', ''))]",
+        "[resourceId('Microsoft.App/containerApps', format('{0}-agent-creator', parameters('baseName')))]",
+        "[resourceId('Microsoft.App/containerApps', format('{0}-agent-podcaster', parameters('baseName')))]",
+        "[resourceId('Microsoft.App/containerApps', format('{0}-agent-research', parameters('baseName')))]"
+      ]
+    }
+  ],
+  "outputs": {
+    "acrLoginServer": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.ContainerRegistry/registries', replace(format('{0}acr', parameters('baseName')), '-', '')), '2023-11-01-preview').loginServer]"
+    },
+    "AZURE_CONTAINER_REGISTRY_ENDPOINT": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.ContainerRegistry/registries', replace(format('{0}acr', parameters('baseName')), '-', '')), '2023-11-01-preview').loginServer]"
+    },
+    "agentResearchUrl": {
+      "type": "string",
+      "value": "[format('https://{0}', reference(resourceId('Microsoft.App/containerApps', format('{0}-agent-research', parameters('baseName'))), '2024-03-01').configuration.ingress.fqdn)]"
+    },
+    "agentCreatorUrl": {
+      "type": "string",
+      "value": "[format('https://{0}', reference(resourceId('Microsoft.App/containerApps', format('{0}-agent-creator', parameters('baseName'))), '2024-03-01').configuration.ingress.fqdn)]"
+    },
+    "devUiUrl": {
+      "type": "string",
+      "value": "[format('https://{0}', reference(resourceId('Microsoft.App/containerApps', format('{0}-dev-ui', parameters('baseName'))), '2024-03-01').configuration.ingress.fqdn)]"
+    },
+    "appInsightsConnectionString": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.Insights/components', format('{0}-appinsights', parameters('baseName'))), '2020-02-02').ConnectionString]"
+    },
+    "appInsightsName": {
+      "type": "string",
+      "value": "[format('{0}-appinsights', parameters('baseName'))]"
+    },
+    "foundryEndpoint": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.CognitiveServices/accounts', format('{0}-foundry', parameters('baseName'))), '2025-04-01-preview').endpoint]"
+    },
+    "foundryProjectName": {
+      "type": "string",
+      "value": "[format('{0}-project', parameters('baseName'))]"
+    },
+    "sandboxGroupResourceId": {
+      "type": "string",
+      "value": "[resourceId('Microsoft.App/sandboxGroups', parameters('sandboxGroupName'))]"
+    },
+    "sandboxGroupIdentityPrincipalId": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('sandboxGroupUamiName')), '2023-01-31').principalId]"
+    },
+    "agentResearchOtelId": {
+      "type": "string",
+      "value": "research-agent"
+    },
+    "agentCreatorOtelId": {
+      "type": "string",
+      "value": "creator-agent"
+    },
+    "agentResearchA2ACard": {
+      "type": "string",
+      "value": "[format('https://{0}/.well-known/agent.json', reference(resourceId('Microsoft.App/containerApps', format('{0}-agent-research', parameters('baseName'))), '2024-03-01').configuration.ingress.fqdn)]"
+    },
+    "agentCreatorA2ACard": {
+      "type": "string",
+      "value": "[format('https://{0}/.well-known/agent.json', reference(resourceId('Microsoft.App/containerApps', format('{0}-agent-creator', parameters('baseName'))), '2024-03-01').configuration.ingress.fqdn)]"
+    },
+    "agentPodcasterUrl": {
+      "type": "string",
+      "value": "[format('https://{0}', reference(resourceId('Microsoft.App/containerApps', format('{0}-agent-podcaster', parameters('baseName'))), '2024-03-01').configuration.ingress.fqdn)]"
+    },
+    "agentPodcasterA2ACard": {
+      "type": "string",
+      "value": "[format('https://{0}/.well-known/agent.json', reference(resourceId('Microsoft.App/containerApps', format('{0}-agent-podcaster', parameters('baseName'))), '2024-03-01').configuration.ingress.fqdn)]"
+    },
+    "storageAccountName": {
+      "type": "string",
+      "value": "[replace(format('{0}store', parameters('baseName')), '-', '')]"
+    },
+    "storageConnectionString": {
+      "type": "string",
+      "value": "[format('DefaultEndpointsProtocol=https;AccountName={0};AccountKey={1};EndpointSuffix={2}', replace(format('{0}store', parameters('baseName')), '-', ''), listKeys(resourceId('Microsoft.Storage/storageAccounts', replace(format('{0}store', parameters('baseName')), '-', '')), '2023-01-01').keys[0].value, environment().suffixes.storage)]"
+    }
+  }
+}

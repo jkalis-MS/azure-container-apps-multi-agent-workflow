@@ -1,0 +1,41 @@
+[project]
+name = "agent-research"
+version = "0.1.0"
+description = "Tech Research Agent - LangGraph / Python"
+requires-python = ">=3.11"
+dependencies = [
+    "langgraph==1.2.1",
+    "langchain-openai==1.2.2",
+    "langchain-community==0.4.1",
+    "fastapi==0.136.1",
+    "uvicorn[standard]==0.47.0",
+    "httpx==0.28.1",
+    "pydantic==2.13.4",
+    "beautifulsoup4==4.14.3",
+    "python-dotenv==1.2.2",
+    "opentelemetry-api==1.42.1",
+    "opentelemetry-sdk==1.42.1",
+    "opentelemetry-instrumentation-fastapi==0.63b1",
+    "opentelemetry-instrumentation-httpx==0.63b1",
+    "opentelemetry-exporter-otlp-proto-grpc==1.42.1",
+    "opentelemetry-instrumentation-openai-v2==2.4b0",
+    "azure-containerapps-sandbox==0.1.0b1",
+    "azure-identity>=1.15",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "pytest-httpx>=0.34",
+]
+
+[tool.setuptools]
+py-modules = ["main", "agent", "a2a"]
+
+[tool.setuptools.packages.find]
+include = ["tools*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

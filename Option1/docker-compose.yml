@@ -1,0 +1,62 @@
+version: "3.9"
+
+services:
+  orchestrator:
+    build: ./packages/orchestrator
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - SIMULATOR_URL=http://simulator:3001
+      - BLOG_GEN_URL=http://blog-generator:3002
+      - NARRATION_GEN_URL=http://narration-generator:3003
+      - OTEL_SERVICE_NAME=wc-orchestrator
+      - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+    depends_on:
+      - simulator
+      - blog-generator
+      - narration-generator
+
+  simulator:
+    build: ./packages/simulator
+    ports:
+      - "3001:3001"
+    environment:
+      - PORT=3001
+      - AZURE_OPENAI_ENDPOINT=${AZURE_OPENAI_ENDPOINT}
+      - AZURE_OPENAI_KEY=${AZURE_OPENAI_KEY}
+      - AZURE_OPENAI_DEPLOYMENT=${AZURE_OPENAI_DEPLOYMENT:-gpt-4o}
+      - AZURE_SUBSCRIPTION_ID=${AZURE_SUBSCRIPTION_ID}
+      - ACA_RESOURCE_GROUP=${ACA_RESOURCE_GROUP}
+      - ACA_SANDBOX_GROUP=${ACA_SANDBOX_GROUP}
+      - AZURE_CLIENT_ID=${AZURE_CLIENT_ID:-}
+      - AZURE_TENANT_ID=${AZURE_TENANT_ID:-}
+      - AZURE_CLIENT_SECRET=${AZURE_CLIENT_SECRET:-}
+      - BING_API_KEY=${BING_API_KEY:-}
+      - OTEL_SERVICE_NAME=wc-simulator
+      - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+
+  blog-generator:
+    build: ./packages/blog-generator
+    ports:
+      - "3002:3002"
+    environment:
+      - ASPNETCORE_URLS=http://+:3002
+      - Azure__OpenAI__Endpoint=${AZURE_OPENAI_ENDPOINT}
+      - Azure__OpenAI__Key=${AZURE_OPENAI_KEY}
+      - Azure__OpenAI__Deployment=${AZURE_OPENAI_DEPLOYMENT:-gpt-4o}
+      - OTEL_SERVICE_NAME=wc-blog-gen
+      - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+
+  narration-generator:
+    build: ./packages/narration-generator
+    ports:
+      - "3003:3003"
+    environment:
+      - PORT=3003
+      - AZURE_OPENAI_ENDPOINT=${AZURE_OPENAI_ENDPOINT}
+      - AZURE_OPENAI_KEY=${AZURE_OPENAI_KEY}
+      - AZURE_OPENAI_DEPLOYMENT=${AZURE_OPENAI_DEPLOYMENT:-gpt-4o}
+      - AZURE_OPENAI_TTS_DEPLOYMENT=${AZURE_OPENAI_TTS_DEPLOYMENT:-tts-hd}
+      - OTEL_SERVICE_NAME=wc-narration-gen
+      - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-}

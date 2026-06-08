@@ -1,0 +1,14 @@
+{
+    "topic": "Azure Container Apps",
+    "summary": "Azure Container Apps is a serverless container platform...",
+    "total_sources": 5,
+    "sources_with_content": 3,
+    "source_counts": {"documentation": 2, "blog": 2, "code_sample": 1},
+    "sources": [
+        {"type": "documentation", "title": "Azure Container Apps overview", "url": "https://learn.microsoft.com/en-us/azure/container-apps/overview", "content": "Azure Container Apps enables you to run microservices and containerized applications on a serverless platform."},
+        {"type": "documentation", "title": "Quickstart: Deploy your first container app", "url": "https://learn.microsoft.com/en-us/azure/container-apps/get-started", "content": "In this quickstart, you create and deploy your first container app using the Azure portal."},
+        {"type": "blog", "title": "What's new in Azure Container Apps", "url": "https://techcommunity.microsoft.com/blog/aca-updates", "content": "Announcing new features including GPU workload profiles and serverless GPU support."},
+        {"type": "blog", "title": "Running AI workloads on ACA", "url": "https://azure.microsoft.com/blog/ai-on-aca", "content": "Learn how to deploy LLM inference on Azure Container Apps with GPU support."},
+        {"type": "code_sample", "title": "azure-samples/container-apps-ai", "url": "https://github.com/azure-samples/container-apps-ai", "description": "Sample code for running AI workloads on Azure Container Apps"}
+    ]
+}
